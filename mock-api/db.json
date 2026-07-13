@@ -1,0 +1,175 @@
+{
+  "users": [
+    { "id": "u1", "name": "Alice Johnson", "role": "creator" },
+    { "id": "u2", "name": "Bob Martinez", "role": "approver" },
+    { "id": "u3", "name": "Chen Wei", "role": "approver" },
+    { "id": "u4", "name": "Dana Patel", "role": "read-only" }
+  ],
+  "documents": [
+    {
+      "id": "d1",
+      "title": "MSA Renewal - Northwind Traders",
+      "documentType": "Contract",
+      "customer": "Northwind Traders",
+      "createdDate": "2026-06-01T09:00:00.000Z",
+      "dueDate": "2026-07-20T00:00:00.000Z",
+      "owner": { "id": "u1", "name": "Alice Johnson" },
+      "status": "draft",
+      "priority": "High",
+      "description": "Annual master service agreement renewal with updated SLA terms.",
+      "approvers": [
+        { "id": "u2", "name": "Bob Martinez" },
+        { "id": "u3", "name": "Chen Wei" }
+      ],
+      "comments": [],
+      "attachments": [
+        { "id": "a1", "name": "msa-draft-v3.pdf", "contentType": "application/pdf", "size": 245000, "url": "http://localhost:4000/sample-files/msa-draft-v3.pdf" }
+      ],
+      "approvalHistory": [
+        { "id": "h1", "action": "created", "actor": "Alice Johnson", "comment": null, "timestamp": "2026-06-01T09:00:00.000Z" }
+      ]
+    },
+    {
+      "id": "d2",
+      "title": "Q3 Invoice - Fabrikam Inc",
+      "documentType": "Invoice",
+      "customer": "Fabrikam Inc",
+      "createdDate": "2026-06-10T14:30:00.000Z",
+      "dueDate": "2026-06-25T00:00:00.000Z",
+      "owner": { "id": "u1", "name": "Alice Johnson" },
+      "status": "pending_approval",
+      "priority": "Medium",
+      "description": "Quarterly invoice for consulting services rendered in Q2.",
+      "approvers": [
+        { "id": "u2", "name": "Bob Martinez" }
+      ],
+      "comments": [
+        { "id": "c1", "author": "Bob Martinez", "text": "Can you confirm the hours breakdown?", "createdAt": "2026-06-11T10:00:00.000Z" }
+      ],
+      "attachments": [],
+      "approvalHistory": [
+        { "id": "h1", "action": "created", "actor": "Alice Johnson", "comment": null, "timestamp": "2026-06-10T14:30:00.000Z" },
+        { "id": "h2", "action": "submitted", "actor": "Alice Johnson", "comment": null, "timestamp": "2026-06-10T15:00:00.000Z" }
+      ]
+    },
+    {
+      "id": "d3",
+      "title": "Proposal - Contoso Cloud Migration",
+      "documentType": "Proposal",
+      "customer": "Contoso Ltd",
+      "createdDate": "2026-05-20T11:00:00.000Z",
+      "dueDate": "2026-07-01T00:00:00.000Z",
+      "owner": { "id": "u4", "name": "Dana Patel" },
+      "status": "approved",
+      "priority": "High",
+      "description": "Proposal covering phased migration to cloud infrastructure.",
+      "approvers": [
+        { "id": "u2", "name": "Bob Martinez" },
+        { "id": "u3", "name": "Chen Wei" }
+      ],
+      "comments": [
+        { "id": "c1", "author": "Chen Wei", "text": "Looks good, timeline is realistic.", "createdAt": "2026-05-22T09:00:00.000Z" }
+      ],
+      "attachments": [
+        { "id": "a1", "name": "migration-proposal.pdf", "contentType": "application/pdf", "size": 512000, "url": "http://localhost:4000/sample-files/migration-proposal.pdf" }
+      ],
+      "approvalHistory": [
+        { "id": "h1", "action": "created", "actor": "Dana Patel", "comment": null, "timestamp": "2026-05-20T11:00:00.000Z" },
+        { "id": "h2", "action": "submitted", "actor": "Dana Patel", "comment": null, "timestamp": "2026-05-20T12:00:00.000Z" },
+        { "id": "h3", "action": "approved", "actor": "Bob Martinez", "comment": null, "timestamp": "2026-05-22T09:30:00.000Z" },
+        { "id": "h4", "action": "approved", "actor": "Chen Wei", "comment": null, "timestamp": "2026-05-22T10:00:00.000Z" }
+      ]
+    },
+    {
+      "id": "d4",
+      "title": "Vendor Report - Litware Supplies",
+      "documentType": "Report",
+      "customer": "Litware Supplies",
+      "createdDate": "2026-06-15T08:00:00.000Z",
+      "dueDate": null,
+      "owner": { "id": "u1", "name": "Alice Johnson" },
+      "status": "rejected",
+      "priority": "Low",
+      "description": "Monthly vendor performance report.",
+      "approvers": [
+        { "id": "u3", "name": "Chen Wei" }
+      ],
+      "comments": [
+        { "id": "c1", "author": "Chen Wei", "text": "Figures for May don't match the finance export.", "createdAt": "2026-06-16T13:00:00.000Z" }
+      ],
+      "attachments": [
+        { "id": "a1", "name": "vendor-report-may.pdf", "contentType": "application/pdf", "size": 120000, "url": "http://localhost:4000/sample-files/vendor-report-may.pdf" }
+      ],
+      "approvalHistory": [
+        { "id": "h1", "action": "created", "actor": "Alice Johnson", "comment": null, "timestamp": "2026-06-15T08:00:00.000Z" },
+        { "id": "h2", "action": "submitted", "actor": "Alice Johnson", "comment": null, "timestamp": "2026-06-15T08:30:00.000Z" },
+        { "id": "h3", "action": "rejected", "actor": "Chen Wei", "comment": "Figures for May don't match the finance export.", "timestamp": "2026-06-16T13:00:00.000Z" }
+      ]
+    },
+    {
+      "id": "d5",
+      "title": "Policy Update - Data Retention",
+      "documentType": "Policy",
+      "customer": "Internal",
+      "createdDate": "2026-04-02T10:00:00.000Z",
+      "dueDate": "2026-04-30T00:00:00.000Z",
+      "owner": { "id": "u4", "name": "Dana Patel" },
+      "status": "approved",
+      "priority": "Medium",
+      "approvers": [
+        { "id": "u2", "name": "Bob Martinez" }
+      ],
+      "comments": [],
+      "approvalHistory": [
+        { "id": "h1", "action": "created", "actor": "Dana Patel", "comment": null, "timestamp": "2026-04-02T10:00:00.000Z" },
+        { "id": "h2", "action": "approved", "actor": "Bob Martinez", "comment": null, "timestamp": "2026-04-10T09:00:00.000Z" }
+      ]
+    },
+    {
+      "id": "d6",
+      "title": "Renewal Proposal - Wingtip Toys",
+      "documentType": "Proposal",
+      "customer": "Wingtip Toys",
+      "createdDate": "2026-07-01T09:15:00.000Z",
+      "dueDate": "2026-07-15T00:00:00.000Z",
+      "owner": { "id": "u1", "name": "Alice Johnson" },
+      "status": "draft",
+      "priority": "Medium",
+      "description": "Renewal terms for the annual retail partnership.",
+      "approvers": [
+        { "id": "u2", "name": "Bob Martinez" }
+      ],
+      "comments": [],
+      "attachments": [
+        { "id": "a1", "name": "scanned-signature-page.png", "contentType": "image/png", "size": 82000, "url": "http://localhost:4000/sample-files/scanned-signature-page.png" }
+      ],
+      "approvalHistory": [
+        { "id": "h1", "action": "created", "actor": "Alice Johnson", "comment": null, "timestamp": "2026-07-01T09:15:00.000Z" }
+      ]
+    },
+    {
+      "id": "d7",
+      "title": "Invoice #4471 - Adventure Works",
+      "documentType": "Invoice",
+      "customer": "Adventure Works",
+      "createdDate": "2026-06-28T16:00:00.000Z",
+      "dueDate": "2026-07-12T00:00:00.000Z",
+      "owner": { "id": "u4", "name": "Dana Patel" },
+      "status": "pending_approval",
+      "priority": "High",
+      "description": "Overdue equipment invoice awaiting sign-off.",
+      "approvers": [
+        { "id": "u2", "name": "Bob Martinez" },
+        { "id": "u3", "name": "Chen Wei" }
+      ],
+      "comments": [],
+      "attachments": [
+        { "id": "a1", "name": "invoice-4471.pdf", "contentType": "application/pdf", "size": 65000, "url": "http://localhost:4000/sample-files/invoice-4471.pdf" }
+      ],
+      "approvalHistory": [
+        { "id": "h1", "action": "created", "actor": "Dana Patel", "comment": null, "timestamp": "2026-06-28T16:00:00.000Z" },
+        { "id": "h2", "action": "submitted", "actor": "Dana Patel", "comment": null, "timestamp": "2026-06-28T16:10:00.000Z" }
+      ]
+    }
+  ]
+}

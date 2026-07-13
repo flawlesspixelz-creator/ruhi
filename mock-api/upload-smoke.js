@@ -1,0 +1,225 @@
+const assert = require("assert/strict");
+const { spawn } = require("child_process");
+const { once } = require("events");
+const fs = require("fs");
+const path = require("path");
+
+const port = 4123;
+const baseUrl = `http://127.0.0.1:${port}`;
+const apiDirectory = __dirname;
+const databasePath = path.join(apiDirectory, "db.json");
+const databaseBeforeTest = fs.readFileSync(databasePath);
+const uploadedFilePaths = [];
+
+const server = spawn(process.execPath, ["server.js"], {
+  cwd: apiDirectory,
+  env: { ...process.env, PORT: String(port) },
+  stdio: ["ignore", "pipe", "inherit"],
+});
+
+function waitForServer() {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error("Mock API did not start")), 5000);
+    server.once("exit", (code) => reject(new Error(`Mock API exited with code ${code}`)));
+    server.stdout.on("data", (chunk) => {
+      if (chunk.toString().includes("Mock API ready")) {
+        clearTimeout(timeout);
+        resolve();
+      }
+    });
+  });
+}
+
+async function requestJson(pathname, options = {}, expectedStatus = 200, retry500 = false) {
+  let response;
+  for (let attempt = 1; attempt <= 12; attempt += 1) {
+    response = await fetch(`${baseUrl}${pathname}`, options);
+    if (!retry500 || response.status !== 500) break;
+  }
+
+  const body = await response.json();
+  assert.equal(
+    response.status,
+    expectedStatus,
+    `${options.method || "GET"} ${pathname}: ${JSON.stringify(body)}`,
+  );
+  return body;
+}
+
+function jsonOptions(method, body) {
+  return {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  };
+}
+
+function draft(title, attachments = []) {
+  return {
+    title,
+    documentType: "Contract",
+    customer: "Internal",
+    createdDate: new Date().toISOString(),
+    dueDate: null,
+    owner: { id: "u1", name: "Alice Johnson" },
+    status: "approved",
+    priority: "Low",
+    description: "Temporary contract-smoke record",
+    approvers: [{ id: "u2", name: "Bob Martinez" }],
+    comments: [{ id: "not-accepted", author: "Test", text: "Ignored" }],
+    attachments,
+    approvalHistory: [{ id: "not-accepted", action: "approved" }],
+  };
+}
+
+async function run() {
+  await waitForServer();
+
+  const homeResponse = await fetch(baseUrl);
+  assert.equal(homeResponse.status, 200);
+  const homePage = await homeResponse.text();
+  assert.match(homePage, /Document Approval Portal mock API/);
+  assert.doesNotMatch(homePage, />undefined</);
+
+  const initialDocuments = await requestJson("/documents");
+  assert.equal(Array.isArray(initialDocuments), true);
+  assert.equal(initialDocuments.length > 0, true);
+
+  const users = await requestJson("/users");
+  assert.equal(Array.isArray(users), true);
+  assert.equal(users.some((user) => user.role === "approver"), true);
+
+  await requestJson("/documents/does-not-exist", {}, 404);
+
+  const missingFileForm = new FormData();
+  await requestJson("/uploads", { method: "POST", body: missingFileForm }, 400);
+
+  const invalidFileForm = new FormData();
+  invalidFileForm.append("file", new Blob(["not a PDF"], { type: "text/plain" }), "bad.txt");
+  await requestJson("/uploads", { method: "POST", body: invalidFileForm }, 415);
+
+  const pdfForm = new FormData();
+  pdfForm.append(
+    "file",
+    new Blob(["%PDF-1.4\n% contract smoke test\n%%EOF\n"], { type: "application/pdf" }),
+    "cross-platform-smoke.pdf",
+  );
+  const attachment = await requestJson("/uploads", { method: "POST", body: pdfForm }, 201);
+  assert.equal(attachment.contentType, "application/pdf");
+  assert.equal(attachment.name, "cross-platform-smoke.pdf");
+  uploadedFilePaths.push(path.join(apiDirectory, "uploads", `${attachment.id}.pdf`));
+
+  const pdfResponse = await fetch(attachment.url);
+  assert.equal(pdfResponse.status, 200);
+  assert.match(pdfResponse.headers.get("content-type"), /^application\/pdf/);
+  assert.equal((await pdfResponse.text()).startsWith("%PDF-"), true);
+
+  const created = await requestJson(
+    "/documents",
+    jsonOptions("POST", draft("Contract smoke: approve", [attachment])),
+    201,
+    true,
+  );
+  assert.equal(created.status, "draft");
+  assert.deepEqual(created.comments, []);
+  assert.deepEqual(created.approvalHistory, []);
+  assert.equal(created.attachments[0].id, attachment.id);
+
+  const fetched = await requestJson(`/documents/${created.id}`);
+  assert.equal(fetched.id, created.id);
+
+  const updated = await requestJson(
+    `/documents/${created.id}`,
+    jsonOptions("PUT", { title: "Contract smoke: updated", status: "approved" }),
+    200,
+    true,
+  );
+  assert.equal(updated.title, "Contract smoke: updated");
+  assert.equal(updated.status, "draft");
+  assert.equal(updated.attachments[0].id, attachment.id);
+
+  const comment = await requestJson(
+    `/documents/${created.id}/comments`,
+    jsonOptions("POST", { author: "Alice Johnson", text: "Smoke-test comment" }),
+    201,
+    true,
+  );
+  assert.equal(comment.text, "Smoke-test comment");
+
+  await requestJson(
+    `/documents/${created.id}/approve`,
+    jsonOptions("POST", { actor: "Bob Martinez" }),
+    409,
+  );
+
+  const submittedForApproval = await requestJson(
+    `/documents/${created.id}/submit`,
+    jsonOptions("POST", { actor: "Alice Johnson" }),
+    200,
+    true,
+  );
+  assert.equal(submittedForApproval.status, "pending_approval");
+
+  const approved = await requestJson(
+    `/documents/${created.id}/approve`,
+    jsonOptions("POST", { actor: "Bob Martinez", comment: "Approved in smoke test" }),
+    200,
+    true,
+  );
+  assert.equal(approved.status, "approved");
+  assert.equal(approved.approvalHistory.at(-1).comment, "Approved in smoke test");
+
+  const rejectionCandidate = await requestJson(
+    "/documents",
+    jsonOptions("POST", draft("Contract smoke: reject")),
+    201,
+    true,
+  );
+  await requestJson(
+    `/documents/${rejectionCandidate.id}/submit`,
+    jsonOptions("POST", { actor: "Alice Johnson" }),
+    200,
+    true,
+  );
+
+  await requestJson(
+    `/documents/${rejectionCandidate.id}/reject`,
+    jsonOptions("POST", { actor: "Bob Martinez", reason: "" }),
+    400,
+  );
+
+  const rejected = await requestJson(
+    `/documents/${rejectionCandidate.id}/reject`,
+    jsonOptions("POST", { actor: "Bob Martinez", reason: "Needs revision" }),
+    200,
+    true,
+  );
+  assert.equal(rejected.status, "rejected");
+  assert.equal(rejected.approvalHistory.at(-1).comment, "Needs revision");
+
+  const returnedToDraft = await requestJson(
+    `/documents/${rejectionCandidate.id}/return-to-draft`,
+    jsonOptions("POST", { actor: "Alice Johnson" }),
+  );
+  assert.equal(returnedToDraft.status, "draft");
+
+  console.log("All documented API contracts passed.");
+}
+
+async function cleanUp() {
+  if (server.exitCode === null) {
+    server.kill("SIGTERM");
+    await Promise.race([once(server, "exit"), new Promise((resolve) => setTimeout(resolve, 2000))]);
+  }
+  fs.writeFileSync(databasePath, databaseBeforeTest);
+  for (const filePath of uploadedFilePaths) {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  }
+}
+
+run()
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  })
+  .finally(cleanUp);
