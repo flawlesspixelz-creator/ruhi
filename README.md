@@ -257,3 +257,18 @@ selector represents authentication for this exercise.
 endpoints and behavior** (`mock-api/db.json`, `mock-api/server.js`). Treat
 them as a fixed fixture for this phase and build only against the documented
 HTTP contract above.
+
+## Added in this submission
+
+- `npm test` (from the root or `web/`) runs the unit and integration test
+  suite (Vitest + Testing Library + MSW). `npm run test:watch --prefix web`
+  for watch mode.
+- `npm run lint` and `npm run typecheck` run oxlint and `tsc -b` for `web/`.
+- `DESIGN.md` documents assumptions, decisions, reuse boundaries, testing
+  rationale, and known limitations.
+- `CLAUDE.md` contains the coding-assistant configuration used during
+  development.
+- New frontend dependencies: `@tanstack/react-query` (server state),
+  `i18next` + `react-i18next` (EN/FI/SV), and dev-only test tooling
+  (`vitest`, `@testing-library/*`, `msw`, `jsdom`). Setup commands are
+  unchanged: `npm run install:all && npm run dev`.
