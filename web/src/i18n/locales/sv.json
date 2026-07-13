@@ -1,0 +1,206 @@
+{
+  "app": {
+    "title": "Portal för dokumentgodkännande",
+    "titleShort": "Dokument",
+    "currentUser": "Aktuell användare:",
+    "language": "Språk",
+    "skipToContent": "Hoppa till huvudinnehåll"
+  },
+  "common": {
+    "loading": "Läser in…",
+    "retry": "Försök igen",
+    "cancel": "Avbryt",
+    "confirm": "Bekräfta",
+    "back": "Tillbaka till dokument",
+    "none": "—",
+    "errorTitle": "Något gick fel",
+    "requiredMark": "(obligatoriskt)",
+    "dismiss": "Stäng"
+  },
+  "status": {
+    "draft": "Utkast",
+    "pending_approval": "Väntar på godkännande",
+    "approved": "Godkänd",
+    "rejected": "Avvisad"
+  },
+  "priority": {
+    "Low": "Låg",
+    "Medium": "Medel",
+    "High": "Hög"
+  },
+  "docType": {
+    "Contract": "Avtal",
+    "Invoice": "Faktura",
+    "Proposal": "Offert",
+    "Report": "Rapport",
+    "Policy": "Policy",
+    "Other": "Övrigt"
+  },
+  "list": {
+    "heading": "Dokument",
+    "newDocument": "Nytt dokument",
+    "searchLabel": "Sök",
+    "searchPlaceholder": "Sök på titel, kund eller ägare",
+    "filters": "Filter",
+    "status": "Status",
+    "type": "Typ",
+    "owner": "Ägare",
+    "from": "Skapad från",
+    "to": "Skapad till",
+    "anyStatus": "Alla statusar",
+    "anyType": "Alla typer",
+    "anyOwner": "Alla ägare",
+    "clearFilters": "Rensa filter",
+    "sortBy": "Sortera efter",
+    "results_one": "{{count}} dokument",
+    "results_other": "{{count}} dokument",
+    "pageOf": "Sida {{page}} av {{total}}",
+    "prevPage": "Föregående sida",
+    "nextPage": "Nästa sida",
+    "col": {
+      "title": "Titel",
+      "customer": "Kund",
+      "type": "Typ",
+      "status": "Status",
+      "priority": "Prioritet",
+      "owner": "Ägare",
+      "created": "Skapad",
+      "due": "Förfallodatum"
+    },
+    "sortAsc": "stigande",
+    "sortDesc": "fallande",
+    "empty": {
+      "title": "Inga dokument ännu",
+      "body": "Skapa ditt första dokument för att starta ett godkännandeflöde."
+    },
+    "emptyFiltered": {
+      "title": "Inga matchande dokument",
+      "body": "Inga dokument matchar aktuell sökning och filter."
+    },
+    "error": {
+      "title": "Kunde inte läsa in dokumenten"
+    }
+  },
+  "detail": {
+    "created": "Skapad",
+    "due": "Förfallodatum",
+    "owner": "Ägare",
+    "customer": "Kund",
+    "type": "Typ",
+    "priority": "Prioritet",
+    "description": "Beskrivning",
+    "noDescription": "Ingen beskrivning.",
+    "approvers": "Godkännare",
+    "attachments": "Bilagor",
+    "noAttachments": "Inga bilagor.",
+    "invalidAttachment": "Bilagetypen stöds inte (endast PDF stöds)",
+    "viewPdf": "Förhandsgranska",
+    "hidePdf": "Dölj förhandsgranskning",
+    "openInNewTab": "Öppna i ny flik",
+    "pdfFrameTitle": "PDF-förhandsgranskning: {{name}}",
+    "pdfError": "PDF-filen kunde inte visas här.",
+    "comments": "Kommentarer",
+    "noComments": "Inga kommentarer ännu.",
+    "addComment": "Lägg till kommentar",
+    "commentLabel": "Ny kommentar",
+    "commentPlaceholder": "Skriv en kommentar…",
+    "commentRequired": "Kommentartext krävs.",
+    "history": "Godkännandehistorik",
+    "historyAction": {
+      "created": "Skapad",
+      "submitted": "Skickad för godkännande",
+      "approved": "Godkänd",
+      "rejected": "Avvisad",
+      "returned_to_draft": "Återförd till utkast"
+    },
+    "actions": {
+      "edit": "Redigera",
+      "submit": "Skicka för godkännande",
+      "approve": "Godkänn",
+      "reject": "Avvisa",
+      "returnToDraft": "Återför till utkast"
+    },
+    "confirmSubmit": {
+      "title": "Skicka för godkännande?",
+      "body": "”{{title}}” skickas till godkännarna och kan inte redigeras medan den väntar."
+    },
+    "confirmApprove": {
+      "title": "Godkänn dokumentet?",
+      "body": "”{{title}}” markeras som godkänt. Detta kan inte ångras.",
+      "commentLabel": "Kommentar (valfritt)"
+    },
+    "confirmReject": {
+      "title": "Avvisa dokumentet?",
+      "body": "”{{title}}” avvisas. Ägaren kan återföra det till utkast och skicka in det igen.",
+      "reasonLabel": "Orsak till avvisning",
+      "reasonRequired": "En orsak till avvisningen krävs."
+    },
+    "confirmReturn": {
+      "title": "Återför till utkast?",
+      "body": "”{{title}}” flyttas tillbaka till utkast så att det kan redigeras och skickas in igen."
+    },
+    "notFound": {
+      "title": "Dokumentet hittades inte",
+      "body": "Dokumentet finns inte eller kan ha tagits bort."
+    },
+    "error": {
+      "title": "Kunde inte läsa in dokumentet"
+    }
+  },
+  "form": {
+    "createHeading": "Nytt dokument",
+    "editHeading": "Redigera dokument",
+    "title": "Titel",
+    "customer": "Kund",
+    "type": "Dokumenttyp",
+    "priority": "Prioritet",
+    "description": "Beskrivning",
+    "approvers": "Godkännare",
+    "approversHint": "Välj minst en godkännare.",
+    "dueDate": "Förfallodatum",
+    "attachment": "PDF-bilaga",
+    "attachmentHint": "Valfritt. En PDF-fil, högst 10 MB.",
+    "currentAttachment": "Nuvarande bilaga",
+    "removeAttachment": "Ta bort bilaga",
+    "selectOne": "Välj…",
+    "uploading": "Laddar upp… {{percent}} %",
+    "create": "Skapa dokument",
+    "save": "Spara ändringar",
+    "saving": "Sparar…",
+    "cancel": "Avbryt",
+    "created": "Dokumentet har skapats.",
+    "updated": "Ändringarna har sparats.",
+    "saveFailed": "Det gick inte att spara: {{message}}",
+    "uploadFailed": "PDF-uppladdningen misslyckades, så dokumentet sparades inte. {{message}}",
+    "unsaved": {
+      "title": "Kasta osparade ändringar?",
+      "body": "Du har osparade ändringar som går förlorade om du lämnar sidan.",
+      "leave": "Kasta och lämna",
+      "stay": "Fortsätt redigera"
+    },
+    "errors": {
+      "titleRequired": "Titel är obligatorisk.",
+      "customerRequired": "Kund är obligatorisk.",
+      "typeRequired": "Dokumenttyp är obligatorisk.",
+      "priorityRequired": "Prioritet är obligatorisk.",
+      "approversRequired": "Välj minst en godkännare.",
+      "dueDateInvalid": "Ange ett giltigt datum.",
+      "dueDateBeforeCreated": "Förfallodatumet kan inte vara tidigare än skapelsedatumet.",
+      "fileNotPdf": "Endast PDF-filer stöds.",
+      "fileTooLarge": "PDF-filen får vara högst 10 MB.",
+      "fileEmpty": "Den valda filen är tom.",
+      "formInvalid": "Rätta de markerade fälten."
+    }
+  },
+  "toast": {
+    "submitted": "Dokumentet har skickats för godkännande.",
+    "approved": "Dokumentet har godkänts.",
+    "rejected": "Dokumentet har avvisats.",
+    "returned": "Dokumentet har återförts till utkast.",
+    "commentAdded": "Kommentaren har lagts till.",
+    "actionFailed": "Åtgärden misslyckades: {{message}}"
+  },
+  "notFound": {
+    "title": "Sidan hittades inte"
+  }
+}

@@ -1,0 +1,206 @@
+{
+  "app": {
+    "title": "Document Approval Portal",
+    "titleShort": "Documents",
+    "currentUser": "Current user:",
+    "language": "Language",
+    "skipToContent": "Skip to main content"
+  },
+  "common": {
+    "loading": "Loading…",
+    "retry": "Try again",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "back": "Back to documents",
+    "none": "—",
+    "errorTitle": "Something went wrong",
+    "requiredMark": "(required)",
+    "dismiss": "Dismiss"
+  },
+  "status": {
+    "draft": "Draft",
+    "pending_approval": "Pending approval",
+    "approved": "Approved",
+    "rejected": "Rejected"
+  },
+  "priority": {
+    "Low": "Low",
+    "Medium": "Medium",
+    "High": "High"
+  },
+  "docType": {
+    "Contract": "Contract",
+    "Invoice": "Invoice",
+    "Proposal": "Proposal",
+    "Report": "Report",
+    "Policy": "Policy",
+    "Other": "Other"
+  },
+  "list": {
+    "heading": "Documents",
+    "newDocument": "New document",
+    "searchLabel": "Search",
+    "searchPlaceholder": "Search by title, customer, or owner",
+    "filters": "Filters",
+    "status": "Status",
+    "type": "Type",
+    "owner": "Owner",
+    "from": "Created from",
+    "to": "Created to",
+    "anyStatus": "Any status",
+    "anyType": "Any type",
+    "anyOwner": "Any owner",
+    "clearFilters": "Clear filters",
+    "sortBy": "Sort by",
+    "results_one": "{{count}} document",
+    "results_other": "{{count}} documents",
+    "pageOf": "Page {{page}} of {{total}}",
+    "prevPage": "Previous page",
+    "nextPage": "Next page",
+    "col": {
+      "title": "Title",
+      "customer": "Customer",
+      "type": "Type",
+      "status": "Status",
+      "priority": "Priority",
+      "owner": "Owner",
+      "created": "Created",
+      "due": "Due"
+    },
+    "sortAsc": "ascending",
+    "sortDesc": "descending",
+    "empty": {
+      "title": "No documents yet",
+      "body": "Create your first document to start an approval workflow."
+    },
+    "emptyFiltered": {
+      "title": "No matching documents",
+      "body": "No documents match the current search and filters."
+    },
+    "error": {
+      "title": "Could not load documents"
+    }
+  },
+  "detail": {
+    "created": "Created",
+    "due": "Due date",
+    "owner": "Owner",
+    "customer": "Customer",
+    "type": "Type",
+    "priority": "Priority",
+    "description": "Description",
+    "noDescription": "No description provided.",
+    "approvers": "Approvers",
+    "attachments": "Attachments",
+    "noAttachments": "No attachments.",
+    "invalidAttachment": "Unsupported attachment (only PDF is supported)",
+    "viewPdf": "Preview",
+    "hidePdf": "Hide preview",
+    "openInNewTab": "Open in a new tab",
+    "pdfFrameTitle": "PDF preview: {{name}}",
+    "pdfError": "The PDF could not be displayed here.",
+    "comments": "Comments",
+    "noComments": "No comments yet.",
+    "addComment": "Add comment",
+    "commentLabel": "New comment",
+    "commentPlaceholder": "Write a comment…",
+    "commentRequired": "Comment text is required.",
+    "history": "Approval history",
+    "historyAction": {
+      "created": "Created",
+      "submitted": "Submitted for approval",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "returned_to_draft": "Returned to draft"
+    },
+    "actions": {
+      "edit": "Edit",
+      "submit": "Submit for approval",
+      "approve": "Approve",
+      "reject": "Reject",
+      "returnToDraft": "Return to draft"
+    },
+    "confirmSubmit": {
+      "title": "Submit for approval?",
+      "body": "\"{{title}}\" will be sent to its approvers and can no longer be edited while pending."
+    },
+    "confirmApprove": {
+      "title": "Approve document?",
+      "body": "\"{{title}}\" will be marked as approved. This cannot be undone.",
+      "commentLabel": "Comment (optional)"
+    },
+    "confirmReject": {
+      "title": "Reject document?",
+      "body": "\"{{title}}\" will be rejected. The owner can return it to draft and resubmit.",
+      "reasonLabel": "Rejection reason",
+      "reasonRequired": "A rejection reason is required."
+    },
+    "confirmReturn": {
+      "title": "Return to draft?",
+      "body": "\"{{title}}\" will move back to draft so it can be edited and resubmitted."
+    },
+    "notFound": {
+      "title": "Document not found",
+      "body": "The document does not exist or may have been removed."
+    },
+    "error": {
+      "title": "Could not load the document"
+    }
+  },
+  "form": {
+    "createHeading": "New document",
+    "editHeading": "Edit document",
+    "title": "Title",
+    "customer": "Customer",
+    "type": "Document type",
+    "priority": "Priority",
+    "description": "Description",
+    "approvers": "Approvers",
+    "approversHint": "Select at least one approver.",
+    "dueDate": "Due date",
+    "attachment": "PDF attachment",
+    "attachmentHint": "Optional. One PDF file, up to 10 MB.",
+    "currentAttachment": "Current attachment",
+    "removeAttachment": "Remove attachment",
+    "selectOne": "Select…",
+    "uploading": "Uploading… {{percent}}%",
+    "create": "Create document",
+    "save": "Save changes",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "created": "Document created.",
+    "updated": "Changes saved.",
+    "saveFailed": "Saving failed: {{message}}",
+    "uploadFailed": "The PDF upload failed, so the document was not saved. {{message}}",
+    "unsaved": {
+      "title": "Discard unsaved changes?",
+      "body": "You have unsaved changes that will be lost if you leave this page.",
+      "leave": "Discard and leave",
+      "stay": "Keep editing"
+    },
+    "errors": {
+      "titleRequired": "Title is required.",
+      "customerRequired": "Customer is required.",
+      "typeRequired": "Document type is required.",
+      "priorityRequired": "Priority is required.",
+      "approversRequired": "Select at least one approver.",
+      "dueDateInvalid": "Enter a valid date.",
+      "dueDateBeforeCreated": "The due date cannot be earlier than the creation date.",
+      "fileNotPdf": "Only PDF files are supported.",
+      "fileTooLarge": "The PDF must be 10 MB or smaller.",
+      "fileEmpty": "The selected file is empty.",
+      "formInvalid": "Please fix the highlighted fields."
+    }
+  },
+  "toast": {
+    "submitted": "Document submitted for approval.",
+    "approved": "Document approved.",
+    "rejected": "Document rejected.",
+    "returned": "Document returned to draft.",
+    "commentAdded": "Comment added.",
+    "actionFailed": "The action failed: {{message}}"
+  },
+  "notFound": {
+    "title": "Page not found"
+  }
+}

@@ -1,0 +1,206 @@
+{
+  "app": {
+    "title": "Dokumenttien hyväksyntäportaali",
+    "titleShort": "Dokumentit",
+    "currentUser": "Nykyinen käyttäjä:",
+    "language": "Kieli",
+    "skipToContent": "Siirry pääsisältöön"
+  },
+  "common": {
+    "loading": "Ladataan…",
+    "retry": "Yritä uudelleen",
+    "cancel": "Peruuta",
+    "confirm": "Vahvista",
+    "back": "Takaisin dokumentteihin",
+    "none": "—",
+    "errorTitle": "Jokin meni pieleen",
+    "requiredMark": "(pakollinen)",
+    "dismiss": "Sulje"
+  },
+  "status": {
+    "draft": "Luonnos",
+    "pending_approval": "Odottaa hyväksyntää",
+    "approved": "Hyväksytty",
+    "rejected": "Hylätty"
+  },
+  "priority": {
+    "Low": "Matala",
+    "Medium": "Keskitaso",
+    "High": "Korkea"
+  },
+  "docType": {
+    "Contract": "Sopimus",
+    "Invoice": "Lasku",
+    "Proposal": "Tarjous",
+    "Report": "Raportti",
+    "Policy": "Käytäntö",
+    "Other": "Muu"
+  },
+  "list": {
+    "heading": "Dokumentit",
+    "newDocument": "Uusi dokumentti",
+    "searchLabel": "Haku",
+    "searchPlaceholder": "Hae otsikolla, asiakkaalla tai omistajalla",
+    "filters": "Suodattimet",
+    "status": "Tila",
+    "type": "Tyyppi",
+    "owner": "Omistaja",
+    "from": "Luotu alkaen",
+    "to": "Luotu asti",
+    "anyStatus": "Kaikki tilat",
+    "anyType": "Kaikki tyypit",
+    "anyOwner": "Kaikki omistajat",
+    "clearFilters": "Tyhjennä suodattimet",
+    "sortBy": "Järjestä",
+    "results_one": "{{count}} dokumentti",
+    "results_other": "{{count}} dokumenttia",
+    "pageOf": "Sivu {{page}} / {{total}}",
+    "prevPage": "Edellinen sivu",
+    "nextPage": "Seuraava sivu",
+    "col": {
+      "title": "Otsikko",
+      "customer": "Asiakas",
+      "type": "Tyyppi",
+      "status": "Tila",
+      "priority": "Prioriteetti",
+      "owner": "Omistaja",
+      "created": "Luotu",
+      "due": "Määräpäivä"
+    },
+    "sortAsc": "nouseva",
+    "sortDesc": "laskeva",
+    "empty": {
+      "title": "Ei dokumentteja",
+      "body": "Luo ensimmäinen dokumentti aloittaaksesi hyväksyntätyönkulun."
+    },
+    "emptyFiltered": {
+      "title": "Ei hakua vastaavia dokumentteja",
+      "body": "Mikään dokumentti ei vastaa nykyistä hakua ja suodattimia."
+    },
+    "error": {
+      "title": "Dokumenttien lataus epäonnistui"
+    }
+  },
+  "detail": {
+    "created": "Luotu",
+    "due": "Määräpäivä",
+    "owner": "Omistaja",
+    "customer": "Asiakas",
+    "type": "Tyyppi",
+    "priority": "Prioriteetti",
+    "description": "Kuvaus",
+    "noDescription": "Ei kuvausta.",
+    "approvers": "Hyväksyjät",
+    "attachments": "Liitteet",
+    "noAttachments": "Ei liitteitä.",
+    "invalidAttachment": "Liitetyyppiä ei tueta (vain PDF tuetaan)",
+    "viewPdf": "Esikatselu",
+    "hidePdf": "Piilota esikatselu",
+    "openInNewTab": "Avaa uudessa välilehdessä",
+    "pdfFrameTitle": "PDF-esikatselu: {{name}}",
+    "pdfError": "PDF-tiedostoa ei voitu näyttää tässä.",
+    "comments": "Kommentit",
+    "noComments": "Ei kommentteja.",
+    "addComment": "Lisää kommentti",
+    "commentLabel": "Uusi kommentti",
+    "commentPlaceholder": "Kirjoita kommentti…",
+    "commentRequired": "Kommentin teksti on pakollinen.",
+    "history": "Hyväksyntähistoria",
+    "historyAction": {
+      "created": "Luotu",
+      "submitted": "Lähetetty hyväksyttäväksi",
+      "approved": "Hyväksytty",
+      "rejected": "Hylätty",
+      "returned_to_draft": "Palautettu luonnokseksi"
+    },
+    "actions": {
+      "edit": "Muokkaa",
+      "submit": "Lähetä hyväksyttäväksi",
+      "approve": "Hyväksy",
+      "reject": "Hylkää",
+      "returnToDraft": "Palauta luonnokseksi"
+    },
+    "confirmSubmit": {
+      "title": "Lähetetäänkö hyväksyttäväksi?",
+      "body": "”{{title}}” lähetetään hyväksyjille, eikä sitä voi muokata odotuksen aikana."
+    },
+    "confirmApprove": {
+      "title": "Hyväksytäänkö dokumentti?",
+      "body": "”{{title}}” merkitään hyväksytyksi. Tätä ei voi perua.",
+      "commentLabel": "Kommentti (valinnainen)"
+    },
+    "confirmReject": {
+      "title": "Hylätäänkö dokumentti?",
+      "body": "”{{title}}” hylätään. Omistaja voi palauttaa sen luonnokseksi ja lähettää uudelleen.",
+      "reasonLabel": "Hylkäyksen syy",
+      "reasonRequired": "Hylkäyksen syy on pakollinen."
+    },
+    "confirmReturn": {
+      "title": "Palautetaanko luonnokseksi?",
+      "body": "”{{title}}” palautetaan luonnokseksi, jotta sitä voi muokata ja sen voi lähettää uudelleen."
+    },
+    "notFound": {
+      "title": "Dokumenttia ei löytynyt",
+      "body": "Dokumenttia ei ole olemassa tai se on poistettu."
+    },
+    "error": {
+      "title": "Dokumentin lataus epäonnistui"
+    }
+  },
+  "form": {
+    "createHeading": "Uusi dokumentti",
+    "editHeading": "Muokkaa dokumenttia",
+    "title": "Otsikko",
+    "customer": "Asiakas",
+    "type": "Dokumentin tyyppi",
+    "priority": "Prioriteetti",
+    "description": "Kuvaus",
+    "approvers": "Hyväksyjät",
+    "approversHint": "Valitse vähintään yksi hyväksyjä.",
+    "dueDate": "Määräpäivä",
+    "attachment": "PDF-liite",
+    "attachmentHint": "Valinnainen. Yksi PDF-tiedosto, enintään 10 Mt.",
+    "currentAttachment": "Nykyinen liite",
+    "removeAttachment": "Poista liite",
+    "selectOne": "Valitse…",
+    "uploading": "Ladataan… {{percent}} %",
+    "create": "Luo dokumentti",
+    "save": "Tallenna muutokset",
+    "saving": "Tallennetaan…",
+    "cancel": "Peruuta",
+    "created": "Dokumentti luotu.",
+    "updated": "Muutokset tallennettu.",
+    "saveFailed": "Tallennus epäonnistui: {{message}}",
+    "uploadFailed": "PDF-lataus epäonnistui, joten dokumenttia ei tallennettu. {{message}}",
+    "unsaved": {
+      "title": "Hylätäänkö tallentamattomat muutokset?",
+      "body": "Sinulla on tallentamattomia muutoksia, jotka menetetään, jos poistut sivulta.",
+      "leave": "Hylkää ja poistu",
+      "stay": "Jatka muokkausta"
+    },
+    "errors": {
+      "titleRequired": "Otsikko on pakollinen.",
+      "customerRequired": "Asiakas on pakollinen.",
+      "typeRequired": "Dokumentin tyyppi on pakollinen.",
+      "priorityRequired": "Prioriteetti on pakollinen.",
+      "approversRequired": "Valitse vähintään yksi hyväksyjä.",
+      "dueDateInvalid": "Anna kelvollinen päivämäärä.",
+      "dueDateBeforeCreated": "Määräpäivä ei voi olla aikaisempi kuin luontipäivä.",
+      "fileNotPdf": "Vain PDF-tiedostot ovat tuettuja.",
+      "fileTooLarge": "PDF-tiedoston on oltava enintään 10 Mt.",
+      "fileEmpty": "Valittu tiedosto on tyhjä.",
+      "formInvalid": "Korjaa korostetut kentät."
+    }
+  },
+  "toast": {
+    "submitted": "Dokumentti lähetetty hyväksyttäväksi.",
+    "approved": "Dokumentti hyväksytty.",
+    "rejected": "Dokumentti hylätty.",
+    "returned": "Dokumentti palautettu luonnokseksi.",
+    "commentAdded": "Kommentti lisätty.",
+    "actionFailed": "Toiminto epäonnistui: {{message}}"
+  },
+  "notFound": {
+    "title": "Sivua ei löytynyt"
+  }
+}
