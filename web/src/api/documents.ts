@@ -1,4 +1,4 @@
-import { apiClient } from "./client";
+import { API_BASE_URL, ApiError, apiClient } from "./client";
 import type { ApprovalDocument, Attachment, Comment } from "../types/document";
 
 export function listDocuments(): Promise<ApprovalDocument[]> {
@@ -14,10 +14,42 @@ export type DocumentDraft = Omit<
   "id" | "status" | "comments" | "approvalHistory"
 >;
 
-export function uploadPdf(file: File): Promise<Attachment> {
-  const body = new FormData();
-  body.append("file", file);
-  return apiClient.postForm<Attachment>("/uploads", body);
+/**
+ * Upload a PDF with progress reporting. Uses XHR because fetch does not
+ * expose upload progress events.
+ */
+export function uploadPdf(
+  file: File,
+  onProgress?: (fraction: number) => void,
+): Promise<Attachment> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${API_BASE_URL}/uploads`);
+    xhr.responseType = "json";
+
+    xhr.upload.addEventListener("progress", (event) => {
+      if (event.lengthComputable && onProgress) {
+        onProgress(event.loaded / event.total);
+      }
+    });
+
+    xhr.addEventListener("load", () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(xhr.response as Attachment);
+      } else {
+        const message =
+          (xhr.response as { error?: string } | null)?.error ??
+          `Upload failed with status ${xhr.status}`;
+        reject(new ApiError(message, xhr.status));
+      }
+    });
+    xhr.addEventListener("error", () => reject(new ApiError("Network error during upload", 0)));
+    xhr.addEventListener("abort", () => reject(new ApiError("Upload cancelled", 0)));
+
+    const body = new FormData();
+    body.append("file", file);
+    xhr.send(body);
+  });
 }
 
 export function createDocument(draft: DocumentDraft): Promise<ApprovalDocument> {
