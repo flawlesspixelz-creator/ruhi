@@ -17,8 +17,17 @@ interface CurrentUserContextValue {
 
 const CurrentUserContext = createContext<CurrentUserContextValue | null>(null);
 
-export function CurrentUserProvider({ children }: { children: ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<CurrentUser>(MOCK_USERS[0]);
+export function CurrentUserProvider({
+  children,
+  initialUser,
+}: {
+  children: ReactNode;
+  /** Override the starting identity (used by tests). */
+  initialUser?: CurrentUser;
+}) {
+  const [currentUser, setCurrentUser] = useState<CurrentUser>(
+    initialUser ?? MOCK_USERS[0],
+  );
 
   return (
     <CurrentUserContext.Provider value={{ currentUser, setCurrentUser }}>

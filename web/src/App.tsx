@@ -1,35 +1,35 @@
-import { Link, Navigate, Route, Routes } from "react-router-dom";
+import { Link, Outlet } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { UserSelector } from "./components/UserSelector";
-import { DocumentListPage } from "./pages/DocumentListPage";
-import { DocumentDetailPage } from "./pages/DocumentDetailPage";
-import { DocumentFormPage } from "./pages/DocumentFormPage";
-import { NotFoundPage } from "./pages/NotFoundPage";
+import { LanguageSelector } from "./components/LanguageSelector";
 import "./App.css";
 
+/** Application chrome: header with simulated auth + language, page outlet. */
 function App() {
+  const { t } = useTranslation();
+
   return (
     <>
+      <a className="skip-link" href="#main-content">
+        {t("app.skipToContent")}
+      </a>
       <header className="app-header">
         <div className="app-header__content">
           <Link to="/documents" className="app-title">
-            <span className="app-title__full">Document Approval Portal</span>
+            <span className="app-title__full">{t("app.title")}</span>
             <span className="app-title__short" aria-hidden="true">
-              Documents
+              {t("app.titleShort")}
             </span>
           </Link>
-          <UserSelector />
+          <div className="app-header__controls">
+            <UserSelector />
+            <LanguageSelector />
+          </div>
         </div>
       </header>
 
-      <main className="app-main">
-        <Routes>
-          <Route path="/" element={<Navigate to="/documents" replace />} />
-          <Route path="/documents" element={<DocumentListPage />} />
-          <Route path="/documents/new" element={<DocumentFormPage />} />
-          <Route path="/documents/:id" element={<DocumentDetailPage />} />
-          <Route path="/documents/:id/edit" element={<DocumentFormPage />} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
+      <main id="main-content" className="app-main">
+        <Outlet />
       </main>
     </>
   );

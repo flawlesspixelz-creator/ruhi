@@ -5,6 +5,8 @@
   --border: #e5e4e7;
   --code-bg: #f4f3ec;
   --accent: #aa3bff;
+  /* Darker variant for text on light backgrounds (WCAG AA 4.5:1). */
+  --accent-text: #7a1fbe;
   --accent-bg: rgba(170, 59, 255, 0.1);
   --accent-border: rgba(170, 59, 255, 0.5);
   --social-bg: rgba(244, 243, 236, 0.5);
@@ -15,7 +17,7 @@
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
-  font: 16px/145% var(--sans);
+  font: 16px/150% var(--sans);
   letter-spacing: 0.18px;
   color-scheme: light dark;
   color: var(--text);
@@ -35,6 +37,7 @@
     --border: #2e303a;
     --code-bg: #1f2028;
     --accent: #c084fc;
+    --accent-text: #c084fc;
     --accent-bg: rgba(192, 132, 252, 0.15);
     --accent-border: rgba(192, 132, 252, 0.5);
     --social-bg: rgba(47, 48, 58, 0.5);
@@ -115,6 +118,8 @@ input,
 select,
 textarea {
   -webkit-tap-highlight-color: transparent;
+  /* Remove the 300ms tap delay on touch devices. */
+  touch-action: manipulation;
 }
 
 @media (max-width: 640px) {
