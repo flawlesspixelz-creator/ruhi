@@ -24,10 +24,12 @@ place:
   unassigned approver seeing approve buttons would contradict it.
 - **Comments are mutating**, so read-only users cannot add them ("read-only
   users must not be offered mutating actions"). They see all content.
-- **Resubmission of a rejected document** goes through Return to draft →
-  edit → submit, because the API only accepts `submit` from `draft`. The UI
-  therefore offers "Return to draft" on rejected documents rather than a
-  direct "Edit" that would hide a state transition from the audit trail.
+- **Rejected documents offer Edit and Return to draft**, matching the
+  brief's workflow table (`Rejected: Edit, resubmit`). Editing in place is
+  legal (`PUT` works on any status and editing never changes status);
+  *resubmission* is Return to draft → submit, because the API only accepts
+  `submit` from `draft`, and the extra transition keeps the audit trail
+  honest.
 - **Self-approval is not prevented** — the brief doesn't require separation
   of duties, and the API allows it. Noted as a possible future rule.
 - The user selector is simulated authentication; switching user is switching

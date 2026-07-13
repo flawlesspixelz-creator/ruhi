@@ -192,6 +192,7 @@ documented HTTP contract above.
 Node.js 18 or later is required.
 
 ```bash
+npm install
 npm run install:all
 npm run dev
 ```

@@ -70,14 +70,16 @@ describe("getAvailableActions", () => {
   describe("rejected", () => {
     const doc = makeDocument({ status: "rejected" });
 
-    it("offers return to draft so the document can be edited and resubmitted", () => {
-      expect(getAvailableActions(doc, CREATOR)).toContain("returnToDraft");
+    it("offers edit and return to draft, per the brief's workflow table", () => {
+      const actions = getAvailableActions(doc, CREATOR);
+      expect(actions).toContain("edit");
+      expect(actions).toContain("returnToDraft");
     });
 
-    it("does not offer direct edit or submit until returned to draft", () => {
+    it("does not offer submit until returned to draft (API accepts submit only from draft)", () => {
       const actions = getAvailableActions(doc, CREATOR);
-      expect(actions).not.toContain("edit");
       expect(actions).not.toContain("submit");
+      expect(actions).not.toContain("approve");
     });
   });
 

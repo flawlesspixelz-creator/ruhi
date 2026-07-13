@@ -29,7 +29,9 @@ export function isAssignedApprover(doc: PermissionSubject, user: CurrentUser): b
  * - Pending approval: approve + reject only for users with the approver role
  *                     who are also assigned as approvers on the document.
  * - Approved:         terminal; view only (comments still allowed).
- * - Rejected:         return to draft, after which edit/submit reopen.
+ * - Rejected:         edit (fix the fields in place) and return to draft;
+ *                     resubmission = return to draft + submit, because the
+ *                     API only accepts submit from the draft status.
  */
 export function getAvailableActions(
   doc: PermissionSubject,
@@ -49,7 +51,7 @@ export function getAvailableActions(
       }
       break;
     case "rejected":
-      actions.push("returnToDraft");
+      actions.push("edit", "returnToDraft");
       break;
     case "approved":
       break;
