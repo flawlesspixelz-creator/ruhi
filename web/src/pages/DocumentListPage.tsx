@@ -41,7 +41,9 @@ export function DocumentListPage() {
   const documentsQuery = useDocumentsQuery();
   const usersQuery = useUsersQuery();
 
-  const canCreate = currentUser.role !== "read-only";
+  // Creating a new document is the creator role's job. Approvers act on
+  // existing documents; read-only users never mutate.
+  const canCreate = currentUser.role === "creator";
 
   const hasActiveFilters = Boolean(
     state.q || state.status || state.type || state.owner || state.from || state.to,

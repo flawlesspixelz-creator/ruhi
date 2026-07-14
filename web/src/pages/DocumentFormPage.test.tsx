@@ -3,7 +3,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { api, seedReadHandlers, server } from "../test/server";
-import { CREATOR, makeDocument } from "../test/fixtures";
+import { APPROVER, CREATOR, makeDocument } from "../test/fixtures";
 import { renderApp } from "../test/utils";
 import type { ApprovalDocument } from "../types/document";
 
@@ -20,6 +20,19 @@ async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("create document form", () => {
+  it("redirects non-creator roles away from the create page", async () => {
+    seedReadHandlers([]);
+
+    const { router } = renderApp({ path: "/documents/new", user: APPROVER });
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/documents"),
+    );
+    expect(
+      screen.queryByRole("button", { name: "Create document" }),
+    ).toBeNull();
+  });
+
   it("blocks submission and highlights every missing required field", async () => {
     seedReadHandlers([]);
     let created = false;

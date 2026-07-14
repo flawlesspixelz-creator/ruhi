@@ -13,11 +13,22 @@ The brief leaves some permission questions open. The assumptions made, all
 centralized in `web/src/domain/permissions.ts` so they can be changed in one
 place:
 
+- **Who can create a new document?** Only the `creator` role. Authoring is the
+  creator's job in the workflow; approvers review and act on existing
+  documents rather than originate them, and read-only users cannot mutate at
+  all. This is deliberately narrower than editing an existing draft (next
+  point): the brief names distinct `creator`, `approver`, and `read-only`
+  roles but only constrains approve/reject and read-only, so limiting *new*
+  document creation to the creator role is the reading that best matches the
+  role names without inventing rules elsewhere. The gate lives in
+  `DocumentListPage` (the New document action) and `DocumentFormPage` (a guard
+  on `/documents/new`).
 - **Who can edit/submit a draft?** Any user except read-only ones, not just
   the owner. The seed data forces this choice: documents d3, d5, and d7 are
   owned by Dana Patel, a read-only user. If editing were owner-only, those
   documents could never be edited by anyone. Treating creators and approvers
-  as one collaborative team matches the data and keeps the workflow unblocked.
+  as one collaborative team for *existing* drafts matches the data and keeps
+  the workflow unblocked, even though only creators may originate new ones.
 - **Who can approve/reject?** Only users with the `approver` role **and**
   who are assigned in the document's approvers list. The brief says the
   approvers list drives "permission-aware workflow behavior", so an

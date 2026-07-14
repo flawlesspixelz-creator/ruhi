@@ -3,7 +3,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { api, seedReadHandlers, server } from "../test/server";
-import { ALL_USERS, CREATOR, READ_ONLY, makeDocument } from "../test/fixtures";
+import { ALL_USERS, APPROVER, CREATOR, READ_ONLY, makeDocument } from "../test/fixtures";
 import { renderApp } from "../test/utils";
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
@@ -99,6 +99,14 @@ describe("document list", () => {
   it("hides the new-document action from read-only users", async () => {
     seedReadHandlers([makeDocument({})]);
     renderApp({ path: "/documents", user: READ_ONLY });
+
+    await screen.findByRole("heading", { name: "Documents" });
+    expect(screen.queryByRole("link", { name: "New document" })).toBeNull();
+  });
+
+  it("hides the new-document action from approvers", async () => {
+    seedReadHandlers([makeDocument({})]);
+    renderApp({ path: "/documents", user: APPROVER });
 
     await screen.findByRole("heading", { name: "Documents" });
     expect(screen.queryByRole("link", { name: "New document" })).toBeNull();

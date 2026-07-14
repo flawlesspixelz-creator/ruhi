@@ -53,13 +53,16 @@ export function DocumentFormPage() {
   const { currentUser } = useCurrentUser();
   const navigate = useNavigate();
 
-  // Read-only users are never offered this page; if they reach it by URL,
-  // send them back rather than presenting a form that cannot be saved.
+  // Creating a new document is limited to the creator role. Edit access to an
+  // existing document is governed per-document by the permission matrix in
+  // EditFormLoader. Anyone who reaches /documents/new without the create right
+  // (approvers, read-only users) is sent back rather than shown a dead form.
+  const canCreateNew = currentUser.role === "creator";
   useEffect(() => {
-    if (currentUser.role === "read-only") navigate("/documents", { replace: true });
-  }, [currentUser.role, navigate]);
+    if (!id && !canCreateNew) navigate("/documents", { replace: true });
+  }, [id, canCreateNew, navigate]);
 
-  if (!id) return <DocumentForm key="new" document={null} />;
+  if (!id) return canCreateNew ? <DocumentForm key="new" document={null} /> : null;
   return <EditFormLoader id={id} />;
 }
 
