@@ -56,6 +56,29 @@ describe("filterDocuments", () => {
       filterDocuments(docs, state({ q: "invoice", status: "draft" })),
     ).toHaveLength(0);
   });
+
+  it("applies the range against UTC day boundaries, not the viewer's timezone", () => {
+    // Upper bound: 23:59Z on the 15th is inside `to=2026-06-15`; 00:30Z on the
+    // 16th is not. These hold in any runner timezone because both the document
+    // instant and the boundary are absolute UTC.
+    const upper = [
+      makeDocument({ id: "late", createdDate: "2026-06-15T23:59:00.000Z" }),
+      makeDocument({ id: "next", createdDate: "2026-06-16T00:30:00.000Z" }),
+    ];
+    expect(filterDocuments(upper, state({ to: "2026-06-15" })).map((d) => d.id)).toEqual([
+      "late",
+    ]);
+
+    // Lower bound: the very start of the 15th (UTC) is included; the end of the
+    // 14th is not.
+    const lower = [
+      makeDocument({ id: "prev", createdDate: "2026-06-14T23:30:00.000Z" }),
+      makeDocument({ id: "start", createdDate: "2026-06-15T00:00:00.000Z" }),
+    ];
+    expect(filterDocuments(lower, state({ from: "2026-06-15" })).map((d) => d.id)).toEqual([
+      "start",
+    ]);
+  });
 });
 
 describe("sortDocuments", () => {

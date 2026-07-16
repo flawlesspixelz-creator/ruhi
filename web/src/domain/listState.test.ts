@@ -16,6 +16,18 @@ describe("parseListState", () => {
     expect(parsed).toEqual(DEFAULT_LIST_STATE);
   });
 
+  it("rejects impossible calendar dates instead of trusting the format", () => {
+    const parsed = parseListState(new URLSearchParams("from=2026-02-30&to=2026-13-01"));
+    expect(parsed.from).toBe("");
+    expect(parsed.to).toBe("");
+  });
+
+  it("keeps real boundary dates, including leap days", () => {
+    const parsed = parseListState(new URLSearchParams("from=2024-02-29&to=2026-02-28"));
+    expect(parsed.from).toBe("2024-02-29");
+    expect(parsed.to).toBe("2026-02-28");
+  });
+
   it("round-trips through serialize and parse", () => {
     const original = {
       ...DEFAULT_LIST_STATE,

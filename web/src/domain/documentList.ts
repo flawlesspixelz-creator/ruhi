@@ -31,8 +31,12 @@ function matchesQuery(doc: ApprovalDocument, q: string): boolean {
 
 function withinDateRange(doc: ApprovalDocument, from: string, to: string): boolean {
   const created = new Date(doc.createdDate).getTime();
-  if (from && created < new Date(`${from}T00:00:00`).getTime()) return false;
-  if (to && created > new Date(`${to}T23:59:59.999`).getTime()) return false;
+  // Anchor the boundaries to UTC (…Z) so the inclusive range lines up with the
+  // stored UTC createdDate. Without the Z, `${from}T00:00:00` parses in the
+  // viewer's local timezone, shifting the cutoff by their UTC offset and
+  // wrongly including/excluding documents near either edge of the range.
+  if (from && created < new Date(`${from}T00:00:00.000Z`).getTime()) return false;
+  if (to && created > new Date(`${to}T23:59:59.999Z`).getTime()) return false;
   return true;
 }
 
