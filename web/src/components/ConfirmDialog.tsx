@@ -42,6 +42,16 @@ export function ConfirmDialog({
   const busyRef = useRef(busy);
   busyRef.current = busy;
 
+  // Capture the element that opened the dialog during render — before the
+  // showModal effect below moves focus into the dialog. Reading
+  // document.activeElement in an effect would capture something already
+  // inside the dialog, so restoration must snapshot the opener here, once.
+  const openerRef = useRef<HTMLElement | null>(null);
+  if (openerRef.current === null && typeof document !== "undefined") {
+    openerRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  }
+
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
@@ -54,8 +64,8 @@ export function ConfirmDialog({
   // that opened the dialog — keyboard and screen-reader users otherwise
   // land back at the top of the document.
   useEffect(() => {
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     return () => {
+      const opener = openerRef.current;
       if (opener && opener.isConnected) opener.focus();
     };
   }, []);
