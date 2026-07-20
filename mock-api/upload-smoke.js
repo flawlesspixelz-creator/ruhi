@@ -406,6 +406,77 @@ async function run() {
     400,
   );
 
+  // Hostile inputs must never crash a handler (500). Empty/wrong-typed
+  // bodies and non-string actors previously threw on req.body access or the
+  // SQLite bind.
+  const fuzzBase = await requestJson("/documents", jsonOptions("POST", draft("Fuzz base")), 201, true);
+  await requestJson(`/documents/${fuzzBase.id}/submit`, jsonOptions("POST", { actor: "u1" }), 200, true);
+  const hostileBodies = [
+    {},
+    { actor: [] },
+    { actor: {} },
+    { actor: 123 },
+    { actor: "u1", title: {} },
+    { actor: "u1", approvers: "nope" },
+    { actor: "u1", attachments: "no" },
+  ];
+  for (const body of hostileBodies) {
+    for (const path of ["/documents", `/documents/${fuzzBase.id}/approve`, `/documents/${fuzzBase.id}/comments`]) {
+      const response = await fetch(`${baseUrl}${path}`, jsonOptions("POST", body));
+      assert.notEqual(response.status, 500, `500 on POST ${path} with ${JSON.stringify(body)}`);
+      await response.json().catch(() => null);
+    }
+  }
+  // A wrong content-type leaves the body unparsed; must be 400, not 500.
+  const formPost = await fetch(`${baseUrl}/documents`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: "actor=u1&title=x",
+  });
+  assert.equal(formPost.status, 400, "form-encoded body should be rejected cleanly");
+  await formPost.json().catch(() => null);
+
+  // SQL injection is stored as literal text and leaves the schema intact.
+  const injection = await requestJson(
+    "/documents",
+    jsonOptions("POST", {
+      ...draft("'; DROP TABLE documents;--"),
+      customer: "Robert'); DROP TABLE users;--",
+    }),
+    201,
+    true,
+  );
+  assert.ok(injection.title.includes("DROP TABLE"));
+  const afterInjection = await requestJson("/documents");
+  assert.ok(Array.isArray(afterInjection) && afterInjection.length > 0);
+
+  // Concurrency: parallel approvals on the same step never double-apply.
+  const raceDoc = await requestJson(
+    "/documents",
+    jsonOptions("POST", {
+      ...draft("Concurrency"),
+      approvers: [{ id: "u2", name: "Bob Martinez" }, { id: "u3", name: "Chen Wei" }],
+    }),
+    201,
+    true,
+  );
+  await requestJson(`/documents/${raceDoc.id}/submit`, jsonOptions("POST", { actor: "u1" }), 200, true);
+  const parallel = await Promise.all(
+    Array.from({ length: 10 }, () =>
+      fetch(`${baseUrl}/documents/${raceDoc.id}/approve`, jsonOptions("POST", { actor: "u2" })).then(async (r) => {
+        await r.json().catch(() => null);
+        return r.status;
+      }),
+    ),
+  );
+  assert.ok(parallel.filter((s) => s === 200).length <= 1, "at most one parallel approval may succeed");
+  const raceResult = await requestJson(`/documents/${raceDoc.id}`);
+  assert.equal(
+    raceResult.approvalSteps.filter((s) => s.approver.id === "u2" && s.status === "approved").length,
+    1,
+    "exactly one approved step for the racing approver",
+  );
+
   console.log("All documented API contracts passed.");
 }
 

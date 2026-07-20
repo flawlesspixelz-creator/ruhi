@@ -154,6 +154,34 @@ describe("rejecting a document", () => {
   });
 });
 
+describe("identity switch closes a pending action dialog", () => {
+  it("dismisses an open approve dialog when the current user changes", async () => {
+    // A dialog opened as the current approver must not survive a switch to a
+    // different user, or confirming would fire the action under the new
+    // identity (e.g. a read-only user issuing an approval).
+    const doc = makeDocument({
+      status: "pending_approval",
+      approvers: [{ id: APPROVER.id, name: APPROVER.name }],
+      approvalSteps: makeSteps([APPROVER]),
+    });
+    seedReadHandlers([doc]);
+
+    const user = userEvent.setup();
+    renderApp({ path: `/documents/${doc.id}`, user: APPROVER });
+
+    await user.click(await screen.findByRole("button", { name: "Approve" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    // Switch identity via the real header selector.
+    await user.selectOptions(
+      screen.getByLabelText(/current user/i),
+      READ_ONLY.id,
+    );
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});
+
 describe("sequential approvals", () => {
   function twoApproverDoc(overrides: Parameters<typeof makeDocument>[0] = {}) {
     return makeDocument({

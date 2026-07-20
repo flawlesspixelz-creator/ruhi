@@ -7,7 +7,17 @@ const multer = require("multer");
 const db = require("./db").open(process.env.DB_PATH || path.join(__dirname, "data.sqlite3"));
 
 const app = express();
-const parseJson = express.json();
+// express.json() only populates req.body for a JSON content-type and leaves
+// it undefined otherwise (empty body, wrong content-type, a JSON array/
+// primitive). Normalize to a plain object so no handler crashes on
+// `req.body.x`, and so a hostile top-level array can't reach the logic.
+function normalizeBody(req, _res, next) {
+  if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+    req.body = {};
+  }
+  next();
+}
+const parseJson = [express.json(), normalizeBody];
 const uploadDirectory = path.join(__dirname, "uploads");
 const maxPdfSize = 10 * 1024 * 1024;
 const upload = multer({
@@ -99,8 +109,10 @@ function requireStatus(row, expected, res) {
 
 function requireActor(req, res) {
   const actor = req.body && req.body.actor;
-  if (!actor) {
-    res.status(400).json({ error: "actor is required" });
+  // Must be a non-empty string: a non-string (array/object/number) would
+  // slip past a truthiness check and then crash the SQLite bind in findUser.
+  if (typeof actor !== "string" || !actor) {
+    res.status(400).json({ error: "actor is required and must be a user id." });
     return null;
   }
   return actor;
