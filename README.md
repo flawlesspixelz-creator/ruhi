@@ -182,10 +182,14 @@ architecture. You may reorganize the frontend and select additional libraries
 where useful. Avoid building a speculative replacement backend during the
 first phase; work against the documented HTTP contract.
 
-**Important:** do not modify the mock API's seed data, existing users, or its
-documented endpoints and behavior (`mock-api/db.json`, `mock-api/server.js`).
-Treat them as a fixed fixture for this phase and build only against the
-documented HTTP contract above.
+**Important (first phase only — superseded by the second phase):** during the
+first phase the mock API's seed data, users, and documented endpoints were a
+fixed fixture (`mock-api/db.json`, `mock-api/server.js`) and the frontend was
+built only against the documented HTTP contract above. The second phase
+explicitly lifted this rule for the persistence layer; see
+[Second phase: sequential approvals](#second-phase-sequential-approvals) and
+[Mock API and datastore](#mock-api-and-datastore) for what changed. The seed
+users and the documented endpoint paths are still preserved.
 
 ### Running the project
 
@@ -209,6 +213,33 @@ npm run typecheck # TypeScript
 npm run lint      # oxlint
 npm run smoke     # mock API contract smoke test, incl. sequential approvals
 ```
+
+### Mock API and datastore
+
+The second phase replaced the original `db.json`/json-server fixture with
+**SQLite** (`better-sqlite3`). Node.js 20 or later is required because that
+dependency ships a native binding; `npm run install:all` compiles or fetches
+it, so run it before `npm run dev`.
+
+- **Schema and seed data** live in `mock-api/db.js`. The database file is
+  created and seeded automatically on first start, so no migration or
+  seeding step is needed.
+- **The database file** defaults to `mock-api/data.sqlite3` and is
+  git-ignored. Unlike the old fixture, workflow changes now persist across
+  restarts.
+- **To reset to a clean seed**, delete the file and restart the API:
+
+  ```bash
+  rm mock-api/data.sqlite3 && npm run dev
+  ```
+
+Environment variables for the mock API:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PORT` | `4000` | Port the mock API listens on |
+| `DB_PATH` | `mock-api/data.sqlite3` | SQLite file location; point it elsewhere to run against a throwaway database |
+| `MOCK_API_DETERMINISTIC` | unset | Set to `1` to disable the simulated latency and random write failures. Used by `npm run smoke`; useful for any scripted or automated run |
 
 The mock API adds latency and occasionally fails write requests so that
 loading and failure states can be exercised.
@@ -286,7 +317,14 @@ Do not build real authentication, a custom production backend, production
 file storage, email delivery, websockets, or a pixel-perfect design. The user
 selector represents authentication for this exercise.
 
-**Do not modify the mock API's seed data, existing users, or its documented
-endpoints and behavior** (`mock-api/db.json`, `mock-api/server.js`). Treat
-them as a fixed fixture for this phase and build only against the documented
-HTTP contract above.
+During the first phase the mock API's seed data, existing users, and
+documented endpoints and behavior were a fixed fixture, and the frontend was
+built only against the documented HTTP contract above.
+
+**This constraint was lifted by the second phase**, which required replacing
+the `db.json`/json-server persistence with a real datastore. `db.json` and
+json-server are gone, replaced by SQLite (`mock-api/db.js` +
+`mock-api/server.js`); see [Mock API and datastore](#mock-api-and-datastore).
+Still preserved: the four seed users, the seven seed documents, and every
+documented endpoint path. The behavioral changes are limited to sequential
+approvals and the payload hardening noted in the contract table.

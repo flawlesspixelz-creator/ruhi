@@ -27,11 +27,15 @@ place:
   `DocumentListPage` (the New document action) and `DocumentFormPage` (the
   guard on `/documents/new`) — no inline role checks in either page.
 - **Who can edit/submit a draft?** Any user except read-only ones, not just
-  the owner. The seed data forces this choice: documents d3, d5, and d7 are
-  owned by Dana Patel, a read-only user. If editing were owner-only, those
-  documents could never be edited by anyone. Treating creators and approvers
-  as one collaborative team for *existing* drafts matches the data and keeps
-  the workflow unblocked.
+  the owner. The brief never restricts editing to the owner, and the seed
+  data shows why owner-only would be fragile: d3, d5, and d7 are owned by
+  Dana Patel, a read-only user who cannot mutate anything. None of those is
+  in an editable status today (two are approved, one is pending), but the
+  moment one reaches draft or rejected — d7 is one rejection away — an
+  owner-only rule would strand it with no user able to edit or resubmit it.
+  Treating creators and approvers as one collaborative team for *existing*
+  drafts keeps the workflow unblocked without inventing a reassignment
+  feature the brief doesn't ask for.
 - **Who can approve/reject?** Only the approver whose turn it is: the first
   step still pending in the document's ordered approval sequence, provided
   they hold the `approver` role. Assigned approvers later in the order must
@@ -130,12 +134,20 @@ web/src/
                 list filtering/sorting/pagination, URL state codec,
                 form/file validation
   api/          typed HTTP client and endpoint functions (supplied, extended)
-  hooks/        TanStack Query wrappers, URL list state, unsaved-changes guard
+  hooks/        TanStack Query wrappers, URL list state, unsaved-changes
+                guard, viewport-derived page size
+  context/      simulated authentication: the current-user provider every
+                permission check reads from
   components/   shared UI: StatusBadge, ConfirmDialog, Toast, Feedback,
                 Pagination, FormField, PdfAttachmentList, QuickApproveReject,
                 selectors
   pages/        route-level composition (list, detail, form, 404)
+  utils/        presentation helpers: date/size formatting, date-input
+                validity (framework-free, unit-tested)
+  types/        shared domain types (ApprovalDocument, ApprovalStep, users)
   i18n/         i18next setup + en/fi/sv resource files
+  test/         MSW server, fixtures, and the render helper used by
+                integration tests
 mock-api/       Express + SQLite mock service (schema and seed in db.js)
 ```
 
@@ -198,15 +210,30 @@ Reject requires a reason before any request is sent; failures render inside
 the dialog and preserve what the user typed.
 
 **Quick approve/reject from the list.** A PR reviewer flagged that approving
-a document required opening its detail page first. The list shows
-Approve/Reject directly on each row for an approver who can act on that
-row's document, using the same `getAvailableActions` check and the same
-confirm-and-mutate pattern (mandatory reject reason, preserved input on
-failure) as the detail page, via a small shared `QuickApproveReject`
-component. Because the check is the shared permission matrix, the quick
-actions became turn-aware in phase two without touching the component. The
-column itself is gated on role, not per-row, so it doesn't appear and
-disappear as the page's data changes.
+a document required opening its detail page first. The list now renders
+Approve/Reject on each row where the current user may act. The permission
+decision stays outside the component — the row asks `getAvailableActions`
+and only then renders `QuickApproveReject`, which owns the interaction
+(confirm dialog, mandatory reject reason, preserved input on failure, toast)
+and no rules. Because the check is the shared permission matrix, the quick
+actions became turn-aware in phase two without touching the component at
+all. The column itself is gated on role, not per-row, so it doesn't appear
+and disappear as the page's data changes.
+
+**i18n with react-i18next.** All UI strings live in en/fi/sv resource files;
+no component holds a literal. Two rules keep the three locales honest: every
+new key is added to all three files in the same change (they currently hold
+an identical 162-key set), and *validation returns i18n keys rather than
+display strings*, so error copy is translated at render time instead of
+being baked into domain logic — which is also what lets the validation unit
+tests assert on stable keys. Dates and file sizes format through `Intl` with
+the active locale rather than hand-rolled formatting, so Finnish and Swedish
+date order comes for free; i18next's plural handling covers count-dependent
+copy. The language choice persists in localStorage, falls back to the
+browser language, and sets `<html lang>` so screen readers switch voice.
+Resources are bundled eagerly: three small JSON files are not worth a
+loading state or a flash of untranslated text, though lazy loading is the
+obvious change if locales multiply.
 
 **Approval progress as a first-class section.** The detail page renders the
 ordered sequence — who has approved (when, with what comment), who is
@@ -226,10 +253,18 @@ Shared where the product concept is genuinely shared:
   decides permissions, which is why sequential turn order was a one-place
   change.
 - `StatusBadge`, `ConfirmDialog`, `Toast`, `FormField`, feedback states
-  (loading/empty/error), `Pagination`, `QuickApproveReject` — consistent UX
-  for concepts that appear on multiple screens.
+  (loading/empty/error), `Pagination` — consistent UX for concepts that
+  appear on multiple screens.
 - `useUsersQuery` backs the header selector, the owner filter, and the
   approver picker — one source for "people".
+
+`QuickApproveReject` is the deliberate exception to the one-consumer rule
+below: only the list renders it, so it is extraction for *encapsulation*
+rather than reuse — it keeps a complete confirm-and-mutate interaction
+(mandatory reject reason, preserved input on failure, toast on success) out
+of an already dense list page, and guarantees that interaction stays
+identical to the detail page's version. What is genuinely shared between the
+two screens is `getAvailableActions`, not the component.
 
 Deliberately **not** abstracted: the three pages compose rather than share a
 generic "resource page" scaffold; the approver checkbox group and the

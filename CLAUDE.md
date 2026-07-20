@@ -1,13 +1,19 @@
 # Project instructions for coding assistants
 
 Document Approval Portal: React 19 + TypeScript (Vite) frontend in `web/`
-against a **fixed** mock API in `mock-api/`.
+against an Express + SQLite mock API in `mock-api/` (schema and seed in
+`mock-api/db.js`).
 
 ## Hard rules
 
-- Never modify `mock-api/db.json`, `mock-api/server.js`, the seed users, or
-  the documented endpoints. They are a fixture; build only against the HTTP
-  contract in `README.md`.
+- The mock API is no longer a frozen fixture: the second phase replaced
+  `db.json`/json-server with SQLite and rewrote `server.js`. It may be
+  changed when a requirement calls for it, but preserve the seed users, the
+  seed documents, and every documented endpoint path, and update the API
+  contract table in `README.md` whenever behavior or payloads change.
+- Approval decisions are sequential and server-authoritative: only the
+  approver whose step is first-pending may approve or reject, and workflow
+  endpoints take `actor` as a **user id**, not a display name.
 - All permission logic goes through `web/src/domain/permissions.ts`. No
   component may decide role/status rules inline.
 - All user-facing strings go through i18next; add every new key to **all
@@ -31,8 +37,9 @@ components.
 
 ## Workflow
 
-- Run before considering a change done:
-  `npm run typecheck --prefix web && npm run lint --prefix web && npm test --prefix web`
+- Run before considering a change done (root scripts):
+  `npm run typecheck && npm run lint && npm test`, plus `npm run smoke` when
+  the mock API or its contract changed.
 - Tests: Vitest + Testing Library + MSW. Domain logic gets exhaustive unit
   tests; user flows get MSW-backed integration tests mounted through
   `web/src/test/utils.tsx` (real routes and providers).
