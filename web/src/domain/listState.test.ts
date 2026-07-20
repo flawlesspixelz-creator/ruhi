@@ -16,6 +16,16 @@ describe("parseListState", () => {
     expect(parsed).toEqual(DEFAULT_LIST_STATE);
   });
 
+  it("does not leak Object.prototype members through the status alias table", () => {
+    // A plain-object alias lookup would treat "constructor"/"toString" as
+    // valid aliases and return a Function as the status, silently emptying
+    // the filtered list and re-serializing garbage into the URL.
+    for (const key of ["constructor", "toString", "valueOf", "hasOwnProperty", "__proto__"]) {
+      const parsed = parseListState(new URLSearchParams(`status=${key}`));
+      expect(parsed.status).toBe("");
+    }
+  });
+
   it("round-trips through serialize and parse", () => {
     const original = {
       ...DEFAULT_LIST_STATE,

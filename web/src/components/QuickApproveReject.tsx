@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useCurrentUser } from "../context/CurrentUserContext";
 import { useApproveDocument, useRejectDocument } from "../hooks/useDocuments";
@@ -55,6 +55,14 @@ export function QuickApproveReject({ document }: { document: ApprovalDocument })
 
   const approve = useApproveDocument(document.id);
   const reject = useRejectDocument(document.id);
+
+  // Same rule as the detail page: switching identity closes any pending
+  // confirmation so an action can never fire as a user it wasn't offered to.
+  useEffect(() => {
+    setPendingAction(null);
+    setText("");
+    setReasonError(null);
+  }, [currentUser.id]);
   const activeMutation =
     pendingAction === "approve" ? approve : pendingAction === "reject" ? reject : null;
 

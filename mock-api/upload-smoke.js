@@ -291,6 +291,121 @@ async function run() {
     409,
   );
 
+  // Input hardening: reject payloads that would corrupt data or store XSS.
+  await requestJson("/documents", jsonOptions("POST", { actor: "u1" }), 400);
+  await requestJson(
+    "/documents",
+    jsonOptions("POST", { ...draft("Bad type"), documentType: "Meme" }),
+    400,
+  );
+  await requestJson(
+    "/documents",
+    jsonOptions("POST", {
+      ...draft("XSS attempt"),
+      attachments: [{ name: "x.pdf", contentType: "application/pdf", size: 1, url: "javascript:alert(1)" }],
+    }),
+    400,
+  );
+  await requestJson(
+    "/documents",
+    jsonOptions("POST", { ...draft("Malformed approver"), approvers: [{ foo: 1 }] }),
+    400,
+  );
+  await requestJson(
+    "/documents",
+    jsonOptions("POST", { ...draft("Read-only approver"), approvers: [{ id: "u4", name: "Dana Patel" }] }),
+    400,
+  );
+  await requestJson(
+    "/documents",
+    jsonOptions("POST", { ...draft("Self approver"), approvers: [{ id: "u1", name: "Alice Johnson" }] }),
+    400,
+  );
+  await requestJson(
+    "/documents",
+    jsonOptions("POST", {
+      ...draft("Duplicate approver"),
+      approvers: [{ id: "u2", name: "Bob Martinez" }, { id: "u2", name: "Bob Martinez" }],
+    }),
+    400,
+  );
+
+  // Approved and pending documents are frozen: PUT is only legal from draft
+  // or rejected, so the audit trail cannot be rewritten after sign-off.
+  await requestJson("/documents/d3", jsonOptions("PUT", { title: "Rewritten after approval" }), 409);
+  await requestJson("/documents/d7", jsonOptions("PUT", { title: "Rewritten mid-review" }), 409);
+
+  // A document's existing legacy attachments (d6 carries a deliberate
+  // non-PDF) must not block editing; only newly added attachments are
+  // validated.
+  const legacyDoc = await requestJson("/documents/d6");
+  const keptLegacy = await requestJson(
+    "/documents/d6",
+    jsonOptions("PUT", { title: legacyDoc.title, attachments: legacyDoc.attachments }),
+    200,
+    true,
+  );
+  assert.equal(keptLegacy.attachments.length, legacyDoc.attachments.length);
+  await requestJson(
+    "/documents/d6",
+    jsonOptions("PUT", {
+      attachments: [...legacyDoc.attachments, { name: "new.pdf", contentType: "text/html", size: 1, url: "https://x" }],
+    }),
+    400,
+  );
+
+  // Clearing a field persists: description:null must null the column.
+  const clearable = await requestJson(
+    "/documents",
+    jsonOptions("POST", { ...draft("Clear description"), description: "to be removed" }),
+    201,
+    true,
+  );
+  const cleared = await requestJson(
+    `/documents/${clearable.id}`,
+    jsonOptions("PUT", { description: null }),
+    200,
+    true,
+  );
+  assert.equal(cleared.description, undefined);
+
+  // Return-to-draft resets the live sequence: approvalSteps must be empty
+  // again (the audit history keeps the decided steps).
+  const resetDoc = await requestJson(
+    "/documents",
+    jsonOptions("POST", draft("Steps reset")),
+    201,
+    true,
+  );
+  await requestJson(`/documents/${resetDoc.id}/submit`, jsonOptions("POST", { actor: "u1" }), 200, true);
+  await requestJson(
+    `/documents/${resetDoc.id}/reject`,
+    jsonOptions("POST", { actor: "u2", reason: "reset check" }),
+    200,
+    true,
+  );
+  const reset = await requestJson(
+    `/documents/${resetDoc.id}/return-to-draft`,
+    jsonOptions("POST", { actor: "u1" }),
+    200,
+    true,
+  );
+  assert.deepEqual(reset.approvalSteps, []);
+
+  // Non-string bodies must 400, not crash the handler.
+  const typeCheckDoc = await requestJson("/documents", jsonOptions("POST", draft("Type checks")), 201, true);
+  await requestJson(`/documents/${typeCheckDoc.id}/submit`, jsonOptions("POST", { actor: "u1" }), 200, true);
+  await requestJson(
+    `/documents/${typeCheckDoc.id}/reject`,
+    jsonOptions("POST", { actor: "u2", reason: 42 }),
+    400,
+  );
+  await requestJson(
+    `/documents/${typeCheckDoc.id}/comments`,
+    jsonOptions("POST", { author: { name: "x" }, text: "hi" }),
+    400,
+  );
+
   console.log("All documented API contracts passed.");
 }
 

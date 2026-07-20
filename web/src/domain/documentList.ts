@@ -52,12 +52,22 @@ export function filterDocuments(
   );
 }
 
-function compareNullableDates(a: string | null, b: string | null): number {
-  // Documents without a due date always sort last, regardless of direction.
-  if (!a && !b) return 0;
-  if (!a) return Number.POSITIVE_INFINITY;
-  if (!b) return Number.NEGATIVE_INFINITY;
-  return new Date(a).getTime() - new Date(b).getTime();
+/**
+ * A due date's sortable timestamp, or null when absent. An unparseable date
+ * string is treated the same as a missing one, so the comparator stays
+ * symmetric (a broken value must not make cmp(a,b) and cmp(b,a) agree in
+ * sign, which would leave the sort order dependent on input order).
+ */
+function dueTime(value: string | null): number | null {
+  if (!value) return null;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? null : time;
+}
+
+/** Sortable timestamp with a stable fallback for unparseable input. */
+function safeTime(value: string): number {
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? 0 : time;
 }
 
 export function sortDocuments(
@@ -75,20 +85,34 @@ export function sortDocuments(
         cmp = a.customer.localeCompare(b.customer, undefined, { sensitivity: "base" });
         break;
       case "priority":
-        cmp = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
+        // Unknown values rank together after the known ones instead of
+        // producing NaN, which would silently disable the whole sort.
+        cmp =
+          (PRIORITY_ORDER[a.priority] ?? Number.MAX_SAFE_INTEGER) -
+          (PRIORITY_ORDER[b.priority] ?? Number.MAX_SAFE_INTEGER);
         break;
       case "status":
-        cmp = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
+        cmp =
+          (STATUS_ORDER[a.status] ?? Number.MAX_SAFE_INTEGER) -
+          (STATUS_ORDER[b.status] ?? Number.MAX_SAFE_INTEGER);
         break;
       case "dueDate": {
-        const dateCmp = compareNullableDates(a.dueDate, b.dueDate);
-        if (!Number.isFinite(dateCmp)) return dateCmp > 0 ? 1 : -1;
-        cmp = dateCmp;
+        const timeA = dueTime(a.dueDate);
+        const timeB = dueTime(b.dueDate);
+        // Documents without a (valid) due date always sort last, regardless
+        // of direction; among themselves they fall through to the tie-break.
+        if (timeA === null && timeB === null) {
+          cmp = 0;
+          break;
+        }
+        if (timeA === null) return 1;
+        if (timeB === null) return -1;
+        cmp = timeA - timeB;
         break;
       }
       case "createdDate":
       default:
-        cmp = new Date(a.createdDate).getTime() - new Date(b.createdDate).getTime();
+        cmp = safeTime(a.createdDate) - safeTime(b.createdDate);
         break;
     }
     if (cmp !== 0) return cmp * dir;

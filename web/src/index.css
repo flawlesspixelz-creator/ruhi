@@ -7,6 +7,13 @@
   --accent: #aa3bff;
   /* Darker variant for text on light backgrounds (WCAG AA 4.5:1). */
   --accent-text: #7a1fbe;
+  /* Solid-fill accent for primary actions: white text reaches 5.38:1 on it
+     (plain --accent only manages 4.39:1). */
+  --accent-strong: #9333ea;
+  /* Text color used on --accent-strong fills. */
+  --on-accent: #fff;
+  /* Success text that clears 4.5:1 on the approved badge's tinted bg. */
+  --success-text: #116329;
   --accent-bg: rgba(170, 59, 255, 0.1);
   --accent-border: rgba(170, 59, 255, 0.5);
   --social-bg: rgba(244, 243, 236, 0.5);
@@ -38,6 +45,11 @@
     --code-bg: #1f2028;
     --accent: #c084fc;
     --accent-text: #c084fc;
+    /* In dark mode the accent is light, so primary buttons flip to dark
+       text on the light-purple fill (6.77:1). */
+    --accent-strong: #c084fc;
+    --on-accent: #16171d;
+    --success-text: #4ade80;
     --accent-bg: rgba(192, 132, 252, 0.15);
     --accent-border: rgba(192, 132, 252, 0.5);
     --social-bg: rgba(47, 48, 58, 0.5);

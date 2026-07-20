@@ -36,6 +36,11 @@ export function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
+  // Escape must not defeat the in-flight guard: cancelling while a request
+  // is pending resets the mutation, hides its outcome, and re-enables the
+  // action button for a second (conflicting) submission.
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
 
   useEffect(() => {
     const dialog = ref.current;
@@ -44,11 +49,23 @@ export function ConfirmDialog({
     if (!open && dialog.open) dialog.close();
   }, [open]);
 
+  // <dialog> moves focus into itself but does nothing on unmount (callers
+  // unmount the component to close it), so restore focus to the element
+  // that opened the dialog — keyboard and screen-reader users otherwise
+  // land back at the top of the document.
+  useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    return () => {
+      if (opener && opener.isConnected) opener.focus();
+    };
+  }, []);
+
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
     const handleCancel = (event: Event) => {
       event.preventDefault();
+      if (busyRef.current) return;
       onCancel();
     };
     dialog.addEventListener("cancel", handleCancel);

@@ -143,7 +143,10 @@ function DocumentForm({ document }: { document: ApprovalDocument | null }) {
     newFile !== null ||
     keptAttachments.length !== (document?.attachments?.length ?? 0);
   const dirtyRef = useRef(false);
-  dirtyRef.current = isDirty && !saving;
+  // The guard stays armed while a save is in flight — closing the tab
+  // mid-upload would otherwise silently lose everything. The success
+  // handler clears the ref itself before navigating away.
+  dirtyRef.current = isDirty;
   const blocker = useUnsavedChangesWarning(dirtyRef);
 
   // The owner (creator on a new document, the existing owner when editing)
@@ -178,11 +181,18 @@ function DocumentForm({ document }: { document: ApprovalDocument | null }) {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    const formElement = event.currentTarget as HTMLFormElement;
     setSaveError(null);
 
     const validationErrors = validateDocumentForm(values, createdDate);
     if (Object.keys(validationErrors).length > 0 || errors.file) {
       setErrors((current) => ({ ...validationErrors, file: current.file }));
+      // Move focus to the first invalid control so keyboard and
+      // screen-reader users land on the problem instead of perceiving a
+      // submit that did nothing.
+      requestAnimationFrame(() => {
+        formElement.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+      });
       return;
     }
 
@@ -215,7 +225,9 @@ function DocumentForm({ document }: { document: ApprovalDocument | null }) {
       customer: values.customer.trim(),
       documentType: values.documentType as DocumentType,
       priority: values.priority as Priority,
-      description: values.description.trim() || undefined,
+      // null, not undefined: JSON.stringify drops undefined keys entirely,
+      // so clearing the description would silently never reach the server.
+      description: values.description.trim() || null,
       approvers,
       dueDate: values.dueDate ? new Date(`${values.dueDate}T00:00:00`).toISOString() : null,
       attachments,

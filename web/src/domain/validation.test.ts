@@ -52,6 +52,21 @@ describe("validateDocumentForm", () => {
       validateDocumentForm({ ...validValues, dueDate: "2026-06-01" }, CREATED),
     ).toEqual({});
   });
+
+  it("rejects dates that match the shape but don't exist on the calendar", () => {
+    // <input type="date"> lets these through via keyboard entry.
+    for (const dueDate of ["2027-02-29", "2026-13-45", "2026-04-31", "9999-99-99"]) {
+      expect(validateDocumentForm({ ...validValues, dueDate }, CREATED)).toMatchObject({
+        dueDate: "form.errors.dueDateInvalid",
+      });
+    }
+  });
+
+  it("accepts a leap-year February 29", () => {
+    expect(
+      validateDocumentForm({ ...validValues, dueDate: "2028-02-29" }, CREATED),
+    ).toEqual({});
+  });
 });
 
 describe("validatePdfFile", () => {

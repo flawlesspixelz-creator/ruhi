@@ -10,11 +10,13 @@ export function getDocument(id: string): Promise<ApprovalDocument> {
 }
 
 // approvalSteps is server-owned: the sequence is created on submit and never
-// accepted from the client, so drafts don't carry it.
+// accepted from the client, so drafts don't carry it. description is
+// `string | null` on the wire — null explicitly clears the stored value,
+// which `undefined` cannot do (JSON.stringify drops the key).
 export type DocumentDraft = Omit<
   ApprovalDocument,
-  "id" | "status" | "comments" | "approvalHistory" | "approvalSteps"
->;
+  "id" | "status" | "comments" | "approvalHistory" | "approvalSteps" | "description"
+> & { description: string | null };
 
 /**
  * Upload a PDF with progress reporting. Uses XHR because fetch does not

@@ -75,7 +75,10 @@ function parseDate(raw: string): string {
 
 function parseStatus(raw: string | null): DocumentStatus | "" {
   if (!raw) return "";
-  if (STATUS_ALIASES[raw]) return STATUS_ALIASES[raw];
+  // Object.hasOwn: a plain-object lookup would also match prototype keys, so
+  // `?status=constructor` would smuggle Object.prototype members through as
+  // a "valid" status and corrupt the state (and the re-serialized URL).
+  if (Object.hasOwn(STATUS_ALIASES, raw)) return STATUS_ALIASES[raw];
   return STATUS_VALUES.includes(raw as DocumentStatus) ? (raw as DocumentStatus) : "";
 }
 

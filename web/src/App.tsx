@@ -15,7 +15,10 @@ function App() {
       </a>
       <header className="app-header">
         <div className="app-header__content">
-          <Link to="/documents" className="app-title">
+          {/* aria-label: the full title span is display:none on small
+              screens (removing it from the accessible name) and the short
+              one is aria-hidden, so without this the link has no name. */}
+          <Link to="/documents" className="app-title" aria-label={t("app.title")}>
             <span className="app-title__full">{t("app.title")}</span>
             <span className="app-title__short" aria-hidden="true">
               {t("app.titleShort")}

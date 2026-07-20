@@ -217,16 +217,74 @@ app.get("/uploads/:filename", (req, res) => {
   res.sendFile(filePath);
 });
 
-function hasInvalidAttachments(attachments) {
+// Attachment URLs render into an <iframe src> and an <a href> in the web
+// app, so anything other than http(s) (javascript:, data:, file:) is a
+// stored-XSS vector and must be rejected at the door.
+function isSafeAttachmentUrl(url) {
+  if (typeof url !== "string") return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+// `exemptIds` lets updates keep a document's existing attachments (some seed
+// records deliberately carry legacy non-PDF data) while still validating
+// anything newly added.
+function hasInvalidAttachments(attachments, exemptIds = new Set()) {
   return (
     !Array.isArray(attachments) ||
     attachments.some(
       (attachment) =>
         !attachment ||
-        attachment.contentType !== "application/pdf" ||
-        typeof attachment.url !== "string",
+        (!exemptIds.has(attachment.id) &&
+          (attachment.contentType !== "application/pdf" ||
+            !isSafeAttachmentUrl(attachment.url))),
     )
   );
+}
+
+const DOCUMENT_TYPES = ["Contract", "Invoice", "Proposal", "Report", "Policy", "Other"];
+const PRIORITIES = ["Low", "Medium", "High"];
+
+function validateDocumentFields(body) {
+  if (typeof body.title !== "string" || !body.title.trim()) return "title is required.";
+  if (!DOCUMENT_TYPES.includes(body.documentType)) {
+    return `documentType must be one of: ${DOCUMENT_TYPES.join(", ")}.`;
+  }
+  if (typeof body.customer !== "string" || !body.customer.trim()) return "customer is required.";
+  if (!PRIORITIES.includes(body.priority)) {
+    return `priority must be one of: ${PRIORITIES.join(", ")}.`;
+  }
+  return null;
+}
+
+// Approvers must resolve to real users with the approver role, and a
+// document's owner may never review their own document. Enforcing this at
+// the API keeps malformed input from creating a document nobody can ever
+// approve (a step whose userId matches no user is permanently stuck).
+function resolveApproverIds(approvers, ownerId) {
+  if (!Array.isArray(approvers)) return { error: "approvers must be an array." };
+  const ids = [];
+  for (const entry of approvers) {
+    const id = typeof entry === "string" ? entry : entry && entry.id;
+    if (typeof id !== "string" || !findUser(id)) {
+      return { error: "Every approver must be a known user id." };
+    }
+    if (findUser(id).role !== "approver") {
+      return { error: `${id} does not have the approver role.` };
+    }
+    if (id === ownerId) {
+      return { error: "A document's owner cannot be one of its approvers." };
+    }
+    if (ids.includes(id)) {
+      return { error: "Approvers must not contain duplicates." };
+    }
+    ids.push(id);
+  }
+  return { ids };
 }
 
 app.get("/users", (req, res) => {
@@ -255,57 +313,84 @@ app.post("/documents", parseJson, (req, res) => {
   if (!owner) {
     return res.status(400).json({ error: "actor must be a known user id." });
   }
+  const fieldError = validateDocumentFields(req.body);
+  if (fieldError) return res.status(400).json({ error: fieldError });
+  const approverResult = resolveApproverIds(req.body.approvers ?? [], owner.id);
+  if (approverResult.error) return res.status(400).json({ error: approverResult.error });
   if (maybeSimulateFailure(res)) return;
 
-  const { owner: _clientOwner, actor: _actor, approvers, attachments: _attachments, ...fields } = req.body;
+  const fields = req.body;
   const id = crypto.randomUUID();
-  const approverIds = Array.isArray(approvers) ? approvers.map((a) => (typeof a === "string" ? a : a.id)) : [];
 
-  db.prepare(
-    `INSERT INTO documents (id, title, document_type, customer, created_date, due_date, owner_id, status, priority, description, approvers, approval_steps)
-     VALUES (@id, @title, @documentType, @customer, @createdDate, @dueDate, @ownerId, 'draft', @priority, @description, @approvers, '[]')`,
-  ).run({
-    id,
-    title: fields.title,
-    documentType: fields.documentType,
-    customer: fields.customer,
-    createdDate: new Date().toISOString(),
-    dueDate: fields.dueDate ?? null,
-    ownerId: owner.id,
-    priority: fields.priority,
-    description: fields.description ?? null,
-    approvers: JSON.stringify(approverIds),
-  });
-
-  for (const attachment of attachments) {
-    db.prepare("INSERT INTO attachments (id, document_id, name, content_type, size, url) VALUES (?, ?, ?, ?, ?, ?)").run(
-      attachment.id || crypto.randomUUID(),
+  db.transaction(() => {
+    db.prepare(
+      `INSERT INTO documents (id, title, document_type, customer, created_date, due_date, owner_id, status, priority, description, approvers, approval_steps)
+       VALUES (@id, @title, @documentType, @customer, @createdDate, @dueDate, @ownerId, 'draft', @priority, @description, @approvers, '[]')`,
+    ).run({
       id,
-      attachment.name,
-      attachment.contentType,
-      attachment.size,
-      attachment.url,
-    );
-  }
+      title: fields.title,
+      documentType: fields.documentType,
+      customer: fields.customer,
+      createdDate: new Date().toISOString(),
+      dueDate: fields.dueDate ?? null,
+      ownerId: owner.id,
+      priority: fields.priority,
+      description: fields.description ?? null,
+      approvers: JSON.stringify(approverResult.ids),
+    });
 
-  pushHistory(id, "created", owner.name);
+    for (const attachment of attachments) {
+      db.prepare(
+        "INSERT INTO attachments (id, document_id, name, content_type, size, url) VALUES (?, ?, ?, ?, ?, ?)",
+      ).run(
+        attachment.id || crypto.randomUUID(),
+        id,
+        attachment.name,
+        attachment.contentType,
+        attachment.size,
+        attachment.url,
+      );
+    }
+
+    pushHistory(id, "created", owner.name);
+  })();
+
   res.status(201).json(serializeDocument(findDocumentRow(id)));
 });
 
 app.put("/documents/:id", parseJson, (req, res) => {
   const row = findDocumentRow(req.params.id);
   if (!row) return res.status(404).json({ error: "Document not found" });
-  if (req.body.attachments && hasInvalidAttachments(req.body.attachments)) {
-    return res.status(400).json({ error: "All attachments must be uploaded PDFs." });
+  // Approved documents are a signed-off audit artifact and pending ones are
+  // mid-review; silently rewriting either would corrupt the trail the
+  // approvals attest to. Editing is only legal from draft and rejected —
+  // the same statuses in which the UI offers the edit action.
+  if (row.status !== "draft" && row.status !== "rejected") {
+    return res.status(409).json({
+      error: `Document is "${row.status}"; only draft or rejected documents can be edited.`,
+    });
   }
-  if (maybeSimulateFailure(res)) return;
+  if (req.body.attachments) {
+    // Existing attachments may be kept as-is (some legacy records carry
+    // non-PDF data on purpose); only newly added ones must be valid PDFs.
+    const existingIds = new Set(
+      db.prepare("SELECT id FROM attachments WHERE document_id = ?").all(row.id).map((a) => a.id),
+    );
+    if (hasInvalidAttachments(req.body.attachments, existingIds)) {
+      return res.status(400).json({ error: "All attachments must be uploaded PDFs." });
+    }
+  }
 
   const { id, status, comments, approvalHistory, createdDate, owner, approvers, attachments, ...editableFields } = req.body;
 
   const updates = { ...editableFields };
-  if (approvers) {
-    updates.approvers = JSON.stringify(approvers.map((a) => (typeof a === "string" ? a : a.id)));
+  if (approvers !== undefined) {
+    const approverResult = resolveApproverIds(approvers, row.owner_id);
+    if (approverResult.error) return res.status(400).json({ error: approverResult.error });
+    updates.approvers = JSON.stringify(approverResult.ids);
   }
+  if (maybeSimulateFailure(res)) return;
+
   const columns = {
     title: "title",
     documentType: "document_type",
@@ -315,26 +400,35 @@ app.put("/documents/:id", parseJson, (req, res) => {
     description: "description",
     approvers: "approvers",
   };
-  const setClauses = Object.keys(updates)
-    .filter((key) => columns[key])
-    .map((key) => `${columns[key]} = @${key}`);
-  if (setClauses.length > 0) {
-    db.prepare(`UPDATE documents SET ${setClauses.join(", ")} WHERE id = @id`).run({ ...updates, id: row.id });
-  }
+  // Object.hasOwn keeps prototype keys ("constructor", "toString") in the
+  // request body from reaching the SQL fragment, and the bind object is
+  // rebuilt from the allow-list so unknown body keys can't break binding.
+  const editableKeys = Object.keys(updates).filter((key) => Object.hasOwn(columns, key));
+  const setClauses = editableKeys.map((key) => `${columns[key]} = @${key}`);
+  const bindValues = { id: row.id };
+  for (const key of editableKeys) bindValues[key] = updates[key];
 
-  if (attachments) {
-    db.prepare("DELETE FROM attachments WHERE document_id = ?").run(row.id);
-    for (const attachment of attachments) {
-      db.prepare("INSERT INTO attachments (id, document_id, name, content_type, size, url) VALUES (?, ?, ?, ?, ?, ?)").run(
-        attachment.id || crypto.randomUUID(),
-        row.id,
-        attachment.name,
-        attachment.contentType,
-        attachment.size,
-        attachment.url,
-      );
+  db.transaction(() => {
+    if (setClauses.length > 0) {
+      db.prepare(`UPDATE documents SET ${setClauses.join(", ")} WHERE id = @id`).run(bindValues);
     }
-  }
+
+    if (attachments) {
+      db.prepare("DELETE FROM attachments WHERE document_id = ?").run(row.id);
+      for (const attachment of attachments) {
+        db.prepare(
+          "INSERT INTO attachments (id, document_id, name, content_type, size, url) VALUES (?, ?, ?, ?, ?, ?)",
+        ).run(
+          attachment.id || crypto.randomUUID(),
+          row.id,
+          attachment.name,
+          attachment.contentType,
+          attachment.size,
+          attachment.url,
+        );
+      }
+    }
+  })();
 
   res.json(serializeDocument(findDocumentRow(row.id)));
 });
@@ -348,6 +442,12 @@ app.post("/documents/:id/submit", parseJson, (req, res) => {
   const approverIds = JSON.parse(row.approvers);
   if (approverIds.length === 0) {
     return res.status(400).json({ error: "At least one approver is required to submit." });
+  }
+  // Re-validate at submit time so documents written before approver
+  // validation existed can't enter a review round nobody can decide.
+  const approverResult = resolveApproverIds(approverIds, row.owner_id);
+  if (approverResult.error) {
+    return res.status(409).json({ error: `Cannot submit: ${approverResult.error}` });
   }
   if (maybeSimulateFailure(res)) return;
 
@@ -382,7 +482,7 @@ app.post("/documents/:id/approve", parseJson, (req, res) => {
 
   step.status = "approved";
   step.decidedAt = new Date().toISOString();
-  step.comment = req.body.comment || null;
+  step.comment = typeof req.body.comment === "string" && req.body.comment ? req.body.comment : null;
   const isLastStep = approvalSteps.every((s) => s.status === "approved");
 
   db.prepare("UPDATE documents SET approval_steps = ?, status = ? WHERE id = ?").run(
@@ -401,7 +501,7 @@ app.post("/documents/:id/reject", parseJson, (req, res) => {
   const actor = requireActor(req, res);
   if (!actor) return;
   const reason = req.body.reason;
-  if (!reason || !reason.trim()) {
+  if (typeof reason !== "string" || !reason.trim()) {
     return res.status(400).json({ error: "A rejection reason is required." });
   }
 
@@ -431,7 +531,10 @@ app.post("/documents/:id/return-to-draft", parseJson, (req, res) => {
   const actor = requireActor(req, res);
   if (!actor) return;
 
-  db.prepare("UPDATE documents SET status = 'draft' WHERE id = ?").run(row.id);
+  // The decided steps stay in approval_history; the live sequence resets so
+  // the next submit starts a clean round (documented contract: approvalSteps
+  // is empty until the document is submitted).
+  db.prepare("UPDATE documents SET status = 'draft', approval_steps = '[]' WHERE id = ?").run(row.id);
   pushHistory(row.id, "returned_to_draft", userRef(actor).name);
   res.json(serializeDocument(findDocumentRow(row.id)));
 });
@@ -440,8 +543,11 @@ app.post("/documents/:id/comments", parseJson, (req, res) => {
   const row = findDocumentRow(req.params.id);
   if (!row) return res.status(404).json({ error: "Document not found" });
   const { author, text } = req.body;
-  if (!text || !text.trim()) {
+  if (typeof text !== "string" || !text.trim()) {
     return res.status(400).json({ error: "Comment text is required." });
+  }
+  if (author !== undefined && typeof author !== "string") {
+    return res.status(400).json({ error: "author must be a string." });
   }
   if (maybeSimulateFailure(res)) return;
 

@@ -251,12 +251,12 @@ loading and failure states can be exercised.
 | `GET` | `/documents` | List documents |
 | `GET` | `/documents/:id` | Get one document; returns 404 when absent |
 | `POST` | `/documents` | Create a draft; body `{ actor, ...documentFields }`. `actor` is the creating user's id; `owner` is derived from it and any client-supplied `owner` is ignored |
-| `PUT` | `/documents/:id` | Update editable fields; ignores `id`, `status`, `owner`, `createdDate`, `comments`, and `approvalHistory` if present in the body |
+| `PUT` | `/documents/:id` | Update editable fields; only Draft and Rejected documents may be edited (`409` otherwise, so approved and in-review documents can't be rewritten). Ignores `id`, `status`, `owner`, `createdDate`, `comments`, and `approvalHistory` if present in the body |
 | `POST` | `/uploads` | Upload one PDF as multipart field `file`; returns attachment metadata |
 | `POST` | `/documents/:id/submit` | Move Draft to Pending Approval; body `{ actor }`. Builds the ordered approval sequence (`approvalSteps`) from the approvers list, one pending step per approver in list order |
 | `POST` | `/documents/:id/approve` | Record the current approver's approval; body `{ actor, comment? }`. Only the first approver whose step is still pending may act; the document becomes Approved when the last step is approved and stays Pending Approval otherwise |
 | `POST` | `/documents/:id/reject` | Reject the document; body `{ actor, reason }`. Only the current approver in line may act; a rejection at any step rejects the whole document |
-| `POST` | `/documents/:id/return-to-draft` | Move Rejected to Draft; body `{ actor }` |
+| `POST` | `/documents/:id/return-to-draft` | Move Rejected to Draft; body `{ actor }`. Clears `approvalSteps` so the next submit starts a fresh round (the decided steps remain in the approval history) |
 | `POST` | `/documents/:id/comments` | Add a comment; body `{ author, text }` |
 | `GET` | `/users` | List the simulated users |
 
@@ -266,6 +266,14 @@ payloads include `approvalSteps`, the ordered approval sequence: each step
 carries `approver`, `status` (`pending` / `approved` / `rejected`),
 `decidedAt`, and `comment`. The array is empty until the document is
 submitted, and is rebuilt on every submit.
+
+Write payloads are validated: required fields and enum values return `400`
+when missing or unknown; every approver must be a known user with the
+`approver` role, must not be the document's owner, and must not repeat; and
+attachment URLs must be `http(s)` (anything else — `javascript:`, `data:` —
+is rejected as a stored-XSS vector). A document's existing attachments are
+exempt from re-validation on update, so legacy records with deliberate
+non-PDF data remain editable.
 
 The list endpoint returns all documents. Write requests can return simulated
 `500` errors, and invalid workflow transitions return a conflict response —

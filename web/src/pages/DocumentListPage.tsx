@@ -304,11 +304,15 @@ function ListResults({
         </label>
       </div>
 
-      <table ref={tableRef} className="document-table">
-        <thead>
-          <tr>
+      {/* Explicit ARIA table roles: the card layout below 720px switches
+          the elements to display:block, which strips their implicit table
+          semantics — the roles keep row/cell navigation working in screen
+          readers at every viewport. */}
+      <table ref={tableRef} className="document-table" role="table">
+        <thead role="rowgroup">
+          <tr role="row">
             {SORTABLE_COLUMNS.map(({ field, labelKey }) => (
-              <th key={field} scope="col" aria-sort={ariaSort(field)}>
+              <th key={field} scope="col" role="columnheader" aria-sort={ariaSort(field)}>
                 <button type="button" className="table-sort" onClick={() => toggleSort(field)}>
                   {t(labelKey)}
                   {state.sort === field ? (
@@ -317,32 +321,34 @@ function ListResults({
                 </button>
               </th>
             ))}
-            <th scope="col">{t("list.col.type")}</th>
-            <th scope="col">{t("list.col.owner")}</th>
-            {showActionsColumn ? <th scope="col">{t("list.col.actions")}</th> : null}
+            <th scope="col" role="columnheader">{t("list.col.type")}</th>
+            <th scope="col" role="columnheader">{t("list.col.owner")}</th>
+            {showActionsColumn ? (
+              <th scope="col" role="columnheader">{t("list.col.actions")}</th>
+            ) : null}
           </tr>
         </thead>
-        <tbody>
+        <tbody role="rowgroup">
           {result.items.map((doc) => (
-            <tr key={doc.id}>
-              <td data-label={t("list.col.title")}>
+            <tr key={doc.id} role="row">
+              <td role="cell" data-label={t("list.col.title")}>
                 <Link to={`/documents/${doc.id}`} className="document-table__title">
                   {doc.title}
                 </Link>
               </td>
-              <td data-label={t("list.col.customer")}>{doc.customer}</td>
-              <td data-label={t("list.col.status")}>
+              <td role="cell" data-label={t("list.col.customer")}>{doc.customer}</td>
+              <td role="cell" data-label={t("list.col.status")}>
                 <StatusBadge status={doc.status} />
               </td>
-              <td data-label={t("list.col.priority")}>{t(`priority.${doc.priority}`)}</td>
-              <td data-label={t("list.col.created")}>{formatDate(doc.createdDate, locale)}</td>
-              <td data-label={t("list.col.due")}>
+              <td role="cell" data-label={t("list.col.priority")}>{t(`priority.${doc.priority}`)}</td>
+              <td role="cell" data-label={t("list.col.created")}>{formatDate(doc.createdDate, locale)}</td>
+              <td role="cell" data-label={t("list.col.due")}>
                 {doc.dueDate ? formatDate(doc.dueDate, locale) : t("common.none")}
               </td>
-              <td data-label={t("list.col.type")}>{t(`docType.${doc.documentType}`)}</td>
-              <td data-label={t("list.col.owner")}>{doc.owner.name}</td>
+              <td role="cell" data-label={t("list.col.type")}>{t(`docType.${doc.documentType}`)}</td>
+              <td role="cell" data-label={t("list.col.owner")}>{doc.owner.name}</td>
               {showActionsColumn ? (
-                <td data-label={t("list.col.actions")}>
+                <td role="cell" data-label={t("list.col.actions")}>
                   {getAvailableActions(doc, currentUser).includes("approve") ? (
                     <QuickApproveReject document={doc} />
                   ) : null}

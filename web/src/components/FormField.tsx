@@ -12,6 +12,7 @@ interface FormFieldProps {
     id: string;
     "aria-invalid": boolean | undefined;
     "aria-describedby": string | undefined;
+    "aria-required": boolean | undefined;
   }) => ReactNode;
 }
 
@@ -44,6 +45,7 @@ export function FormField({ label, required, errorKey, hint, children }: FormFie
         id,
         "aria-invalid": errorKey ? true : undefined,
         "aria-describedby": describedBy,
+        "aria-required": required || undefined,
       })}
       {hint ? (
         <p id={hintId} className="form-field__hint">
@@ -51,7 +53,10 @@ export function FormField({ label, required, errorKey, hint, children }: FormFie
         </p>
       ) : null}
       {errorKey ? (
-        <p id={errorId} className="form-field__error">
+        // role="alert" announces the error the moment it appears; without
+        // it a screen-reader user who submits an invalid form perceives
+        // nothing happening at all.
+        <p id={errorId} className="form-field__error" role="alert">
           {t(errorKey)}
         </p>
       ) : null}

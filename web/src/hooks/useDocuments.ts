@@ -106,6 +106,9 @@ export function useAddComment(id: string) {
       addComment(id, author, text),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: documentKeys.detail(id) });
+      // Same rule as every other workflow mutation: the list is invalidated
+      // too, so anything derived from the collection can never go stale.
+      queryClient.invalidateQueries({ queryKey: documentKeys.all, exact: true });
     },
   });
 }

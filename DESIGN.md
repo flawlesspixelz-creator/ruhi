@@ -45,19 +45,21 @@ place:
 - **Comments are mutating**, so read-only users cannot add them ("read-only
   users must not be offered mutating actions"). They see all content.
 - **Rejected documents offer Edit and Return to draft**, matching the
-  brief's workflow table (`Rejected: Edit, resubmit`). Editing in place is
-  legal (`PUT` works on any status and editing never changes status);
-  *resubmission* is Return to draft → submit, because the API only accepts
-  `submit` from `draft`, and the extra transition keeps the audit trail
-  honest.
+  brief's workflow table (`Rejected: Edit, resubmit`). Editing never changes
+  status, and the API only permits `PUT` from `draft` and `rejected` — an
+  approved document is a signed-off artifact and a pending one is
+  mid-review, so both are frozen server-side (`409`). *Resubmission* is
+  Return to draft → submit, because the API only accepts `submit` from
+  `draft`, and the extra transition keeps the audit trail honest.
 - **Self-review is prevented entirely.** An assigned approver who also owns
   a pending document gets neither "approve" nor "reject" — even when their
   step comes up in the sequence. Deciding the outcome of your own document
   either way is the conflict of interest, not just the positive outcome.
   They can still comment. Enforced in `getAvailableActions` in
   `domain/permissions.ts`, so the buttons are simply absent rather than
-  disabled; the server does not enforce this rule itself, so a direct API
-  call could still bypass it (a known limitation).
+  disabled — and at the source by the API, which rejects any attempt to
+  list a document's owner among its approvers, so an owner can never hold
+  an approval step in the first place.
 - **A document's owner can never be selected as one of its own approvers.**
   This is the same conflict self-review guards against, caught earlier: the
   create/edit form filters the owner (the creator on a new document, the
@@ -358,12 +360,13 @@ root, or `npm run test:watch --prefix web` during work.
 Limitations: search matches title/customer/owner only; single new attachment
 per save (existing ones can be removed individually); no optimistic updates
 (every action waits for the server); language files are bundled eagerly;
-list data can be up to 30 s stale after external changes; self-review
-(approve/reject on your own document) is blocked client-side only — the
-server enforces turn order but not owner-approver conflicts, so a direct
-API call could still bypass that rule; on a rejected document the unreached
-steps read "waiting for their turn" although that round will never resume,
-which is slightly imprecise wording.
+list data can be up to 30 s stale after external changes; date-range
+filtering anchors its boundaries to UTC while the date column renders in
+the viewer's local timezone, so near-midnight documents can appear on
+different calendar days than the filter assumes (a deliberate trade-off —
+UTC keeps shared filter URLs stable across timezones); on a rejected
+document the unreached steps read "waiting for their turn" although that
+round will never resume, which is slightly imprecise wording.
 
 Top 3 next improvements, in order:
 

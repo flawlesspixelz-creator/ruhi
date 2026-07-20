@@ -89,6 +89,32 @@ describe("sortDocuments", () => {
     const sorted = sortDocuments(docs, state({ sort: "title", dir: "asc" }));
     expect(sorted.map((d) => d.id)).toEqual(["a", "b"]);
   });
+
+  it("keeps sorting the known priorities even when an unknown value appears", () => {
+    // An unknown rank must not produce NaN comparisons, which would leave
+    // the whole array in input order. Unknowns rank after the known values.
+    const docs = [
+      makeDocument({ id: "h", priority: "High" }),
+      makeDocument({ id: "u", priority: "Urgent" as never }),
+      makeDocument({ id: "l", priority: "Low" }),
+    ];
+    const sorted = sortDocuments(docs, state({ sort: "priority", dir: "asc" }));
+    expect(sorted.map((d) => d.id)).toEqual(["l", "h", "u"]);
+  });
+
+  it("orders an unparseable due date like a missing one, independent of input order", () => {
+    // The comparator must be symmetric: cmp(a,b) and cmp(b,a) have to agree,
+    // or the result depends on the order documents arrived from the server.
+    const docs = [
+      makeDocument({ id: "bad", dueDate: "not-a-date" }),
+      makeDocument({ id: "ok", dueDate: "2026-07-01T00:00:00.000Z" }),
+      makeDocument({ id: "none", dueDate: null }),
+    ];
+    const forward = sortDocuments(docs, state({ sort: "dueDate", dir: "asc" }));
+    const backward = sortDocuments([...docs].reverse(), state({ sort: "dueDate", dir: "asc" }));
+    expect(forward.map((d) => d.id)).toEqual(backward.map((d) => d.id));
+    expect(forward[0].id).toBe("ok");
+  });
 });
 
 describe("applyListState pagination", () => {

@@ -1,4 +1,5 @@
 import type { DocumentType, Priority } from "../types/document";
+import { isValidDateInputValue } from "../utils/format";
 
 export const MAX_PDF_BYTES = 10 * 1024 * 1024;
 
@@ -43,7 +44,10 @@ export function validateDocumentForm(
   }
 
   if (values.dueDate) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(values.dueDate)) {
+    // Shape alone isn't enough: browsers let impossible dates like
+    // 2027-02-29 through keyboard entry in <input type="date">, so the
+    // value must also exist on the calendar.
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(values.dueDate) || !isValidDateInputValue(values.dueDate)) {
       errors.dueDate = "form.errors.dueDateInvalid";
     } else if (values.dueDate < toDateOnly(createdDate)) {
       errors.dueDate = "form.errors.dueDateBeforeCreated";

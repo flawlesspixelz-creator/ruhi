@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useCurrentUser } from "../context/CurrentUserContext";
@@ -77,6 +77,15 @@ function DocumentDetail({ document }: { document: ApprovalDocument }) {
   // Workflow endpoints identify the acting user by id; the server resolves
   // the display name for the audit trail (and validates approval turn order).
   const actor = currentUser.id;
+
+  // Switching identity invalidates any confirmation opened as the previous
+  // user: the new user may not even be offered the action behind the modal,
+  // and confirming would fire it under their id.
+  useEffect(() => {
+    setPendingAction(null);
+    setActionComment("");
+    setReasonError(null);
+  }, [currentUser.id]);
 
   const activeMutation =
     pendingAction === "submit"
