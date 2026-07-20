@@ -1,4 +1,4 @@
-import type { ApprovalDocument } from "../types/document";
+import type { ApprovalDocument, ApprovalStep, UserRef } from "../types/document";
 import type { CurrentUser } from "../types/user";
 
 export const CREATOR: CurrentUser = { id: "u1", name: "Alice Johnson", role: "creator" };
@@ -25,6 +25,7 @@ export function makeDocument(
     status: "draft",
     priority: "Medium",
     approvers: [{ id: APPROVER.id, name: APPROVER.name }],
+    approvalSteps: [],
     comments: [],
     attachments: [],
     approvalHistory: [
@@ -38,4 +39,24 @@ export function makeDocument(
     ],
     ...overrides,
   };
+}
+
+/**
+ * Builds an ordered approval sequence the way the server does on submit:
+ * every listed user gets a pending step, in order. Decide earlier steps with
+ * `decide` overrides keyed by user id.
+ */
+export function makeSteps(
+  users: CurrentUser[] | UserRef[],
+  decide: Record<string, Pick<ApprovalStep, "status" | "decidedAt" | "comment">> = {},
+): ApprovalStep[] {
+  return users.map((user) => {
+    const pending: ApprovalStep = {
+      approver: { id: user.id, name: user.name },
+      status: "pending",
+      decidedAt: null,
+      comment: null,
+    };
+    return { ...pending, ...decide[user.id] };
+  });
 }

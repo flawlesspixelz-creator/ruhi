@@ -559,6 +559,45 @@ textarea:focus-visible,
   background: var(--code-bg);
 }
 
+/* ---------- Approval steps ---------- */
+
+.approval-steps {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  counter-reset: approval-step;
+}
+
+.approval-steps__step {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  counter-increment: approval-step;
+}
+
+.approval-steps__step--current {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+}
+
+.approval-steps__headline strong {
+  color: var(--text-h);
+}
+
+.approval-steps__headline::before {
+  content: counter(approval-step) ". ";
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+.approval-steps__comment {
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+
 /* ---------- Comments & history ---------- */
 
 .comment-list,

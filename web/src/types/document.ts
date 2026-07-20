@@ -24,6 +24,21 @@ export interface Attachment {
   url: string;
 }
 
+export type ApprovalStepStatus = "pending" | "approved" | "rejected";
+
+/**
+ * One entry in a document's ordered approval sequence. Steps are created from
+ * the approvers list (in order) when the document is submitted, and frozen
+ * from that point: editing the approvers of a pending document does not
+ * change the steps of the in-flight approval round.
+ */
+export interface ApprovalStep {
+  approver: UserRef;
+  status: ApprovalStepStatus;
+  decidedAt: string | null;
+  comment: string | null;
+}
+
 export interface ApprovalHistoryEntry {
   id: string;
   action: "created" | "submitted" | "approved" | "rejected" | "returned_to_draft";
@@ -47,6 +62,8 @@ export interface ApprovalDocument {
   priority: Priority;
   description?: string;
   approvers: UserRef[];
+  /** Ordered approval sequence; empty until the document is submitted. */
+  approvalSteps: ApprovalStep[];
   comments: Comment[];
   attachments?: Attachment[];
   approvalHistory: ApprovalHistoryEntry[];

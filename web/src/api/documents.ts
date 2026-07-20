@@ -9,9 +9,11 @@ export function getDocument(id: string): Promise<ApprovalDocument> {
   return apiClient.get<ApprovalDocument>(`/documents/${id}`);
 }
 
+// approvalSteps is server-owned: the sequence is created on submit and never
+// accepted from the client, so drafts don't carry it.
 export type DocumentDraft = Omit<
   ApprovalDocument,
-  "id" | "status" | "comments" | "approvalHistory"
+  "id" | "status" | "comments" | "approvalHistory" | "approvalSteps"
 >;
 
 /**

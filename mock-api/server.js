@@ -356,7 +356,7 @@ app.post("/documents/:id/submit", parseJson, (req, res) => {
     JSON.stringify(approvalSteps),
     row.id,
   );
-  pushHistory(row.id, "submitted", actor);
+  pushHistory(row.id, "submitted", userRef(actor).name);
   res.json(serializeDocument(findDocumentRow(row.id)));
 });
 
@@ -432,7 +432,7 @@ app.post("/documents/:id/return-to-draft", parseJson, (req, res) => {
   if (!actor) return;
 
   db.prepare("UPDATE documents SET status = 'draft' WHERE id = ?").run(row.id);
-  pushHistory(row.id, "returned_to_draft", actor);
+  pushHistory(row.id, "returned_to_draft", userRef(actor).name);
   res.json(serializeDocument(findDocumentRow(row.id)));
 });
 

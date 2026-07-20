@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { canCreateDocument, getAvailableActions, isEligibleApprover } from "./permissions";
-import { APPROVER, CREATOR, OTHER_APPROVER, READ_ONLY, makeDocument } from "../test/fixtures";
+import {
+  canCreateDocument,
+  currentApprover,
+  getAvailableActions,
+  isEligibleApprover,
+} from "./permissions";
+import {
+  APPROVER,
+  CREATOR,
+  OTHER_APPROVER,
+  READ_ONLY,
+  makeDocument,
+  makeSteps,
+} from "../test/fixtures";
 
 /**
  * The permission matrix is the core business rule of the portal: it decides
@@ -24,6 +36,8 @@ describe("getAvailableActions", () => {
   });
 
   describe("pending approval", () => {
+    // No approvalSteps here on purpose: a pending document without steps
+    // exercises the phase-one fallback (any assigned approver may act).
     const doc = makeDocument({
       status: "pending_approval",
       approvers: [{ id: APPROVER.id, name: APPROVER.name }],
@@ -95,6 +109,81 @@ describe("getAvailableActions", () => {
     });
   });
 
+  describe("sequential approval order", () => {
+    const bothApprovers = [
+      { id: APPROVER.id, name: APPROVER.name },
+      { id: OTHER_APPROVER.id, name: OTHER_APPROVER.name },
+    ];
+
+    it("offers approve/reject only to the first approver whose step is pending", () => {
+      const doc = makeDocument({
+        status: "pending_approval",
+        approvers: bothApprovers,
+        approvalSteps: makeSteps([APPROVER, OTHER_APPROVER]),
+      });
+
+      expect(getAvailableActions(doc, APPROVER)).toEqual(
+        expect.arrayContaining(["approve", "reject"]),
+      );
+      const laterActions = getAvailableActions(doc, OTHER_APPROVER);
+      expect(laterActions).not.toContain("approve");
+      expect(laterActions).not.toContain("reject");
+      expect(laterActions).toContain("comment");
+    });
+
+    it("moves the turn to the next approver once the first has approved", () => {
+      const doc = makeDocument({
+        status: "pending_approval",
+        approvers: bothApprovers,
+        approvalSteps: makeSteps([APPROVER, OTHER_APPROVER], {
+          [APPROVER.id]: {
+            status: "approved",
+            decidedAt: "2026-06-02T10:00:00.000Z",
+            comment: null,
+          },
+        }),
+      });
+
+      expect(getAvailableActions(doc, OTHER_APPROVER)).toEqual(
+        expect.arrayContaining(["approve", "reject"]),
+      );
+      const doneActions = getAvailableActions(doc, APPROVER);
+      expect(doneActions).not.toContain("approve");
+      expect(doneActions).not.toContain("reject");
+    });
+
+    it("blocks self-review even when it is the owner's turn", () => {
+      const doc = makeDocument({
+        status: "pending_approval",
+        owner: { id: APPROVER.id, name: APPROVER.name },
+        approvers: bothApprovers,
+        approvalSteps: makeSteps([APPROVER, OTHER_APPROVER]),
+      });
+
+      const actions = getAvailableActions(doc, APPROVER);
+      expect(actions).not.toContain("approve");
+      expect(actions).not.toContain("reject");
+    });
+
+    it("offers no approval actions on a rejected document despite unreached pending steps", () => {
+      const doc = makeDocument({
+        status: "rejected",
+        approvers: bothApprovers,
+        approvalSteps: makeSteps([APPROVER, OTHER_APPROVER], {
+          [APPROVER.id]: {
+            status: "rejected",
+            decidedAt: "2026-06-02T10:00:00.000Z",
+            comment: "Missing appendix",
+          },
+        }),
+      });
+
+      const actions = getAvailableActions(doc, OTHER_APPROVER);
+      expect(actions).not.toContain("approve");
+      expect(actions).not.toContain("reject");
+    });
+  });
+
   describe("read-only users", () => {
     it.each(["draft", "pending_approval", "approved", "rejected"] as const)(
       "get no actions at all when the document is %s",
@@ -106,6 +195,45 @@ describe("getAvailableActions", () => {
         expect(getAvailableActions(doc, READ_ONLY)).toEqual([]);
       },
     );
+  });
+});
+
+describe("currentApprover", () => {
+  it("is the approver of the first pending step", () => {
+    const doc = makeDocument({
+      status: "pending_approval",
+      approvalSteps: makeSteps([APPROVER, OTHER_APPROVER]),
+    });
+    expect(currentApprover(doc)?.id).toBe(APPROVER.id);
+  });
+
+  it("skips decided steps to find the active one", () => {
+    const doc = makeDocument({
+      status: "pending_approval",
+      approvalSteps: makeSteps([APPROVER, OTHER_APPROVER], {
+        [APPROVER.id]: {
+          status: "approved",
+          decidedAt: "2026-06-02T10:00:00.000Z",
+          comment: null,
+        },
+      }),
+    });
+    expect(currentApprover(doc)?.id).toBe(OTHER_APPROVER.id);
+  });
+
+  it("is null when every step is decided or no steps exist", () => {
+    expect(currentApprover(makeDocument({ status: "draft" }))).toBeNull();
+    const allDecided = makeDocument({
+      status: "approved",
+      approvalSteps: makeSteps([APPROVER], {
+        [APPROVER.id]: {
+          status: "approved",
+          decidedAt: "2026-06-02T10:00:00.000Z",
+          comment: null,
+        },
+      }),
+    });
+    expect(currentApprover(allDecided)).toBeNull();
   });
 });
 

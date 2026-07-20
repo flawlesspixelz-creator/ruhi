@@ -106,6 +106,15 @@
     "addComment": "Lisää kommentti",
     "commentLabel": "Uusi kommentti",
     "commentPlaceholder": "Kirjoita kommentti…",
+    "steps": {
+      "title": "Hyväksynnän eteneminen",
+      "status": {
+        "current": "Odottaa päätöstä",
+        "waiting": "Odottaa vuoroaan",
+        "approved": "Hyväksytty",
+        "rejected": "Hylätty"
+      }
+    },
     "history": "Hyväksyntähistoria",
     "historyAction": {
       "created": "Luotu",

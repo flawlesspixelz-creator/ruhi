@@ -234,6 +234,10 @@ async function run() {
     true,
   );
   assert.equal(firstApproved.status, "pending_approval");
+  assert.deepEqual(
+    firstApproved.approvalSteps.map((step) => step.status),
+    ["approved", "pending"],
+  );
   const fullyApproved = await requestJson(
     `/documents/${sequential.id}/approve`,
     jsonOptions("POST", { actor: "u3" }),
@@ -241,6 +245,51 @@ async function run() {
     true,
   );
   assert.equal(fullyApproved.status, "approved");
+  assert.deepEqual(
+    fullyApproved.approvalSteps.map((step) => step.status),
+    ["approved", "approved"],
+  );
+
+  // A rejection mid-sequence rejects the whole document, and a decided
+  // approver cannot act again.
+  const sequentialReject = await requestJson(
+    "/documents",
+    jsonOptions("POST", {
+      ...draft("Sequential smoke test: reject"),
+      approvers: [{ id: "u2", name: "Bob Martinez" }, { id: "u3", name: "Chen Wei" }],
+    }),
+    201,
+    true,
+  );
+  await requestJson(
+    `/documents/${sequentialReject.id}/submit`,
+    jsonOptions("POST", { actor: "u1" }),
+    200,
+    true,
+  );
+  await requestJson(
+    `/documents/${sequentialReject.id}/approve`,
+    jsonOptions("POST", { actor: "u2" }),
+    200,
+    true,
+  );
+  const rejectedMidway = await requestJson(
+    `/documents/${sequentialReject.id}/reject`,
+    jsonOptions("POST", { actor: "u3", reason: "Budget line missing" }),
+    200,
+    true,
+  );
+  assert.equal(rejectedMidway.status, "rejected");
+  assert.deepEqual(
+    rejectedMidway.approvalSteps.map((step) => step.status),
+    ["approved", "rejected"],
+  );
+  assert.equal(rejectedMidway.approvalSteps.at(-1).comment, "Budget line missing");
+  await requestJson(
+    `/documents/${sequentialReject.id}/approve`,
+    jsonOptions("POST", { actor: "u2" }),
+    409,
+  );
 
   console.log("All documented API contracts passed.");
 }

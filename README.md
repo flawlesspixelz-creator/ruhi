@@ -201,6 +201,15 @@ This starts the mock API at `http://localhost:4000` and the web application at
 `http://localhost:5173`. The web app reads `VITE_API_BASE_URL` and defaults to
 the local API when it is unset.
 
+Checks run from the repository root:
+
+```bash
+npm test          # web unit + integration tests (Vitest)
+npm run typecheck # TypeScript
+npm run lint      # oxlint
+npm run smoke     # mock API contract smoke test, incl. sequential approvals
+```
+
 The mock API adds latency and occasionally fails write requests so that
 loading and failure states can be exercised.
 
@@ -213,15 +222,23 @@ loading and failure states can be exercised.
 | `POST` | `/documents` | Create a draft; body `{ actor, ...documentFields }`. `actor` is the creating user's id; `owner` is derived from it and any client-supplied `owner` is ignored |
 | `PUT` | `/documents/:id` | Update editable fields; ignores `id`, `status`, `owner`, `createdDate`, `comments`, and `approvalHistory` if present in the body |
 | `POST` | `/uploads` | Upload one PDF as multipart field `file`; returns attachment metadata |
-| `POST` | `/documents/:id/submit` | Move Draft to Pending Approval; body `{ actor }` |
-| `POST` | `/documents/:id/approve` | Move Pending to Approved; body `{ actor, comment? }` |
-| `POST` | `/documents/:id/reject` | Move Pending to Rejected; body `{ actor, reason }` |
+| `POST` | `/documents/:id/submit` | Move Draft to Pending Approval; body `{ actor }`. Builds the ordered approval sequence (`approvalSteps`) from the approvers list, one pending step per approver in list order |
+| `POST` | `/documents/:id/approve` | Record the current approver's approval; body `{ actor, comment? }`. Only the first approver whose step is still pending may act; the document becomes Approved when the last step is approved and stays Pending Approval otherwise |
+| `POST` | `/documents/:id/reject` | Reject the document; body `{ actor, reason }`. Only the current approver in line may act; a rejection at any step rejects the whole document |
 | `POST` | `/documents/:id/return-to-draft` | Move Rejected to Draft; body `{ actor }` |
 | `POST` | `/documents/:id/comments` | Add a comment; body `{ author, text }` |
 | `GET` | `/users` | List the simulated users |
 
+On workflow endpoints `actor` is always the acting user's **id** (for example
+`u2`); the server resolves display names for the audit trail itself. Document
+payloads include `approvalSteps`, the ordered approval sequence: each step
+carries `approver`, `status` (`pending` / `approved` / `rejected`),
+`decidedAt`, and `comment`. The array is empty until the document is
+submitted, and is rebuilt on every submit.
+
 The list endpoint returns all documents. Write requests can return simulated
-`500` errors, and invalid workflow transitions return a conflict response.
+`500` errors, and invalid workflow transitions return a conflict response —
+including an approver acting before their turn in the sequence.
 Uploaded PDFs are stored locally by the mock service and served from the URL
 returned by `/uploads`; this is development storage, not a production design.
 

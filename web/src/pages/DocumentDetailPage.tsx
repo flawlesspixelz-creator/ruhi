@@ -74,7 +74,9 @@ function DocumentDetail({ document }: { document: ApprovalDocument }) {
   const returnDraft = useReturnToDraft(document.id);
 
   const actions = getAvailableActions(document, currentUser);
-  const actor = currentUser.name;
+  // Workflow endpoints identify the acting user by id; the server resolves
+  // the display name for the audit trail (and validates approval turn order).
+  const actor = currentUser.id;
 
   const activeMutation =
     pendingAction === "submit"
@@ -250,6 +252,8 @@ function DocumentDetail({ document }: { document: ApprovalDocument }) {
         </div>
       </dl>
 
+      <ApprovalStepsSection document={document} />
+
       <section className="detail__section">
         <h2>{t("detail.description")}</h2>
         {document.description ? (
@@ -326,6 +330,54 @@ function DocumentDetail({ document }: { document: ApprovalDocument }) {
         </ConfirmDialog>
       ) : null}
     </article>
+  );
+}
+
+/**
+ * The ordered approval sequence for a submitted document. Approvals are
+ * sequential, so the list makes explicit whose turn it is ("awaiting
+ * decision"), who is queued behind them, and what each earlier approver
+ * decided and when. Hidden for drafts, which have no steps yet.
+ */
+function ApprovalStepsSection({ document }: { document: ApprovalDocument }) {
+  const { t, i18n } = useTranslation();
+
+  if (document.approvalSteps.length === 0) return null;
+
+  const currentIndex = document.approvalSteps.findIndex((step) => step.status === "pending");
+
+  return (
+    <section className="detail__section">
+      <h2>{t("detail.steps.title")}</h2>
+      <ol className="approval-steps">
+        {document.approvalSteps.map((step, index) => {
+          // A rejected document has no active turn: the remaining pending
+          // steps are simply never reached in this round.
+          const isCurrent = index === currentIndex && document.status === "pending_approval";
+          const statusKey = isCurrent
+            ? "current"
+            : step.status === "pending"
+              ? "waiting"
+              : step.status;
+          return (
+            <li
+              key={`${step.approver.id}-${index}`}
+              className={`approval-steps__step${isCurrent ? " approval-steps__step--current" : ""}`}
+              aria-current={isCurrent ? "step" : undefined}
+            >
+              <p className="approval-steps__headline">
+                <strong>{step.approver.name}</strong> ·{" "}
+                {t(`detail.steps.status.${statusKey}`)}
+              </p>
+              {step.decidedAt ? (
+                <p className="muted">{formatDateTime(step.decidedAt, i18n.language)}</p>
+              ) : null}
+              {step.comment ? <p className="approval-steps__comment">{step.comment}</p> : null}
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }
 

@@ -106,6 +106,15 @@
     "addComment": "Lägg till kommentar",
     "commentLabel": "Ny kommentar",
     "commentPlaceholder": "Skriv en kommentar…",
+    "steps": {
+      "title": "Godkännandeförlopp",
+      "status": {
+        "current": "Väntar på beslut",
+        "waiting": "Väntar på sin tur",
+        "approved": "Godkänd",
+        "rejected": "Avvisad"
+      }
+    },
     "history": "Godkännandehistorik",
     "historyAction": {
       "created": "Skapad",

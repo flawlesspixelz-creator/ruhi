@@ -6,7 +6,11 @@
   },
   "scripts": {
     "dev": "concurrently -n api,web -c blue,green \"npm run dev --prefix mock-api\" \"npm run dev --prefix web\"",
-    "install:all": "npm install --prefix mock-api && npm install --prefix web"
+    "install:all": "npm install --prefix mock-api && npm install --prefix web",
+    "test": "npm test --prefix web",
+    "typecheck": "npm run typecheck --prefix web",
+    "lint": "npm run lint --prefix web",
+    "smoke": "npm run smoke --prefix mock-api"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

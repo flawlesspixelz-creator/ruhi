@@ -106,6 +106,15 @@
     "addComment": "Add comment",
     "commentLabel": "New comment",
     "commentPlaceholder": "Write a comment…",
+    "steps": {
+      "title": "Approval progress",
+      "status": {
+        "current": "Awaiting decision",
+        "waiting": "Waiting for their turn",
+        "approved": "Approved",
+        "rejected": "Rejected"
+      }
+    },
     "history": "Approval history",
     "historyAction": {
       "created": "Created",

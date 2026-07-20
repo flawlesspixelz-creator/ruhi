@@ -73,7 +73,7 @@ export function QuickApproveReject({ document }: { document: ApprovalDocument })
     };
     if (pendingAction === "approve") {
       approve.mutate(
-        { actor: currentUser.name, comment: text.trim() || undefined },
+        { actor: currentUser.id, comment: text.trim() || undefined },
         { onSuccess: onSuccess("toast.approved") },
       );
     } else if (pendingAction === "reject") {
@@ -83,7 +83,7 @@ export function QuickApproveReject({ document }: { document: ApprovalDocument })
       }
       setReasonError(null);
       reject.mutate(
-        { actor: currentUser.name, reason: text.trim() },
+        { actor: currentUser.id, reason: text.trim() },
         { onSuccess: onSuccess("toast.rejected") },
       );
     }

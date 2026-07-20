@@ -142,7 +142,7 @@ describe("document list", () => {
     const dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: "Approve" }));
 
-    await waitFor(() => expect(requestBody).toMatchObject({ actor: APPROVER.name }));
+    await waitFor(() => expect(requestBody).toMatchObject({ actor: APPROVER.id }));
     expect(await screen.findByText("Document approved.")).toBeInTheDocument();
   });
 
