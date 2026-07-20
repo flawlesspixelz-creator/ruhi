@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { api, seedReadHandlers, server } from "../test/server";
@@ -104,12 +104,12 @@ describe("document list", () => {
     expect(screen.queryByRole("link", { name: "New document" })).toBeNull();
   });
 
-  it("hides the new-document action from approvers", async () => {
+  it("shows the new-document action to approvers", async () => {
     seedReadHandlers([makeDocument({})]);
     renderApp({ path: "/documents", user: APPROVER });
 
     await screen.findByRole("heading", { name: "Documents" });
-    expect(screen.queryByRole("link", { name: "New document" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "New document" })).not.toBeNull();
   });
 
   it("offers the new-document action to creators", async () => {
@@ -117,5 +117,90 @@ describe("document list", () => {
     renderApp({ path: "/documents", user: CREATOR });
 
     expect(await screen.findByRole("link", { name: "New document" })).toBeInTheDocument();
+  });
+
+  it("lets an assigned approver approve directly from the list", async () => {
+    const doc = makeDocument({
+      id: "quick-1",
+      status: "pending_approval",
+      approvers: [{ id: APPROVER.id, name: APPROVER.name }],
+    });
+    seedReadHandlers([doc]);
+    let requestBody: Record<string, unknown> | null = null;
+    server.use(
+      http.post(api("/documents/quick-1/approve"), async ({ request }) => {
+        requestBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ...doc, status: "approved" });
+      }),
+    );
+
+    const user = userEvent.setup();
+    renderApp({ path: "/documents", user: APPROVER });
+
+    await screen.findByText(doc.title);
+    await user.click(screen.getByRole("button", { name: "Approve" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Approve" }));
+
+    await waitFor(() => expect(requestBody).toMatchObject({ actor: APPROVER.name }));
+    expect(await screen.findByText("Document approved.")).toBeInTheDocument();
+  });
+
+  it("requires a reason before rejecting from the list", async () => {
+    const doc = makeDocument({
+      id: "quick-2",
+      status: "pending_approval",
+      approvers: [{ id: APPROVER.id, name: APPROVER.name }],
+    });
+    seedReadHandlers([doc]);
+    let rejected = false;
+    server.use(
+      http.post(api("/documents/quick-2/reject"), () => {
+        rejected = true;
+        return HttpResponse.json({ ...doc, status: "rejected" });
+      }),
+    );
+
+    const user = userEvent.setup();
+    renderApp({ path: "/documents", user: APPROVER });
+
+    await screen.findByText(doc.title);
+    await user.click(screen.getByRole("button", { name: "Reject" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Reject" }));
+
+    expect(
+      await within(dialog).findByText("A rejection reason is required."),
+    ).toBeInTheDocument();
+    expect(rejected).toBe(false);
+  });
+
+  it("hides the actions column from users who are not approvers", async () => {
+    seedReadHandlers([
+      makeDocument({
+        id: "quick-3",
+        status: "pending_approval",
+        approvers: [{ id: APPROVER.id, name: APPROVER.name }],
+      }),
+    ]);
+    renderApp({ path: "/documents", user: CREATOR });
+
+    await screen.findByRole("heading", { name: "Documents" });
+    expect(screen.queryByRole("columnheader", { name: "Actions" })).toBeNull();
+  });
+
+  it("does not offer quick approve/reject for a document the approver owns", async () => {
+    const doc = makeDocument({
+      id: "quick-4",
+      status: "pending_approval",
+      owner: { id: APPROVER.id, name: APPROVER.name },
+      approvers: [{ id: APPROVER.id, name: APPROVER.name }],
+    });
+    seedReadHandlers([doc]);
+    renderApp({ path: "/documents", user: APPROVER });
+
+    await screen.findByText(doc.title);
+    expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reject" })).toBeNull();
   });
 });

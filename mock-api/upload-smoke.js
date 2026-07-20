@@ -7,13 +7,13 @@ const path = require("path");
 const port = 4123;
 const baseUrl = `http://127.0.0.1:${port}`;
 const apiDirectory = __dirname;
-const databasePath = path.join(apiDirectory, "db.json");
-const databaseBeforeTest = fs.readFileSync(databasePath);
+const databasePath = path.join(apiDirectory, "smoke-test.sqlite3");
+fs.rmSync(databasePath, { force: true });
 const uploadedFilePaths = [];
 
 const server = spawn(process.execPath, ["server.js"], {
   cwd: apiDirectory,
-  env: { ...process.env, PORT: String(port) },
+  env: { ...process.env, PORT: String(port), DB_PATH: databasePath, MOCK_API_DETERMINISTIC: "1" },
   stdio: ["ignore", "pipe", "inherit"],
 });
 
@@ -61,6 +61,7 @@ function draft(title, attachments = []) {
     customer: "Internal",
     createdDate: new Date().toISOString(),
     dueDate: null,
+    actor: "u1",
     owner: { id: "u1", name: "Alice Johnson" },
     status: "approved",
     priority: "Low",
@@ -122,7 +123,8 @@ async function run() {
   );
   assert.equal(created.status, "draft");
   assert.deepEqual(created.comments, []);
-  assert.deepEqual(created.approvalHistory, []);
+  assert.equal(created.approvalHistory.length, 1);
+  assert.equal(created.approvalHistory[0].action, "created");
   assert.equal(created.attachments[0].id, attachment.id);
 
   const fetched = await requestJson(`/documents/${created.id}`);
@@ -148,13 +150,13 @@ async function run() {
 
   await requestJson(
     `/documents/${created.id}/approve`,
-    jsonOptions("POST", { actor: "Bob Martinez" }),
+    jsonOptions("POST", { actor: "u2" }),
     409,
   );
 
   const submittedForApproval = await requestJson(
     `/documents/${created.id}/submit`,
-    jsonOptions("POST", { actor: "Alice Johnson" }),
+    jsonOptions("POST", { actor: "u1" }),
     200,
     true,
   );
@@ -162,7 +164,7 @@ async function run() {
 
   const approved = await requestJson(
     `/documents/${created.id}/approve`,
-    jsonOptions("POST", { actor: "Bob Martinez", comment: "Approved in smoke test" }),
+    jsonOptions("POST", { actor: "u2", comment: "Approved in smoke test" }),
     200,
     true,
   );
@@ -177,20 +179,20 @@ async function run() {
   );
   await requestJson(
     `/documents/${rejectionCandidate.id}/submit`,
-    jsonOptions("POST", { actor: "Alice Johnson" }),
+    jsonOptions("POST", { actor: "u1" }),
     200,
     true,
   );
 
   await requestJson(
     `/documents/${rejectionCandidate.id}/reject`,
-    jsonOptions("POST", { actor: "Bob Martinez", reason: "" }),
+    jsonOptions("POST", { actor: "u2", reason: "" }),
     400,
   );
 
   const rejected = await requestJson(
     `/documents/${rejectionCandidate.id}/reject`,
-    jsonOptions("POST", { actor: "Bob Martinez", reason: "Needs revision" }),
+    jsonOptions("POST", { actor: "u2", reason: "Needs revision" }),
     200,
     true,
   );
@@ -199,9 +201,46 @@ async function run() {
 
   const returnedToDraft = await requestJson(
     `/documents/${rejectionCandidate.id}/return-to-draft`,
-    jsonOptions("POST", { actor: "Alice Johnson" }),
+    jsonOptions("POST", { actor: "u1" }),
   );
   assert.equal(returnedToDraft.status, "draft");
+
+  // Sequential approvals: with two approvers, only the current one in line
+  // may act, and one rejection anywhere rejects the whole document.
+  const sequential = await requestJson(
+    "/documents",
+    jsonOptions("POST", {
+      ...draft("Sequential smoke test"),
+      approvers: [{ id: "u2", name: "Bob Martinez" }, { id: "u3", name: "Chen Wei" }],
+    }),
+    201,
+    true,
+  );
+  await requestJson(
+    `/documents/${sequential.id}/submit`,
+    jsonOptions("POST", { actor: "u1" }),
+    200,
+    true,
+  );
+  await requestJson(
+    `/documents/${sequential.id}/approve`,
+    jsonOptions("POST", { actor: "u3" }),
+    409,
+  );
+  const firstApproved = await requestJson(
+    `/documents/${sequential.id}/approve`,
+    jsonOptions("POST", { actor: "u2" }),
+    200,
+    true,
+  );
+  assert.equal(firstApproved.status, "pending_approval");
+  const fullyApproved = await requestJson(
+    `/documents/${sequential.id}/approve`,
+    jsonOptions("POST", { actor: "u3" }),
+    200,
+    true,
+  );
+  assert.equal(fullyApproved.status, "approved");
 
   console.log("All documented API contracts passed.");
 }
@@ -211,7 +250,7 @@ async function cleanUp() {
     server.kill("SIGTERM");
     await Promise.race([once(server, "exit"), new Promise((resolve) => setTimeout(resolve, 2000))]);
   }
-  fs.writeFileSync(databasePath, databaseBeforeTest);
+  fs.rmSync(databasePath, { force: true });
   for (const filePath of uploadedFilePaths) {
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
   }

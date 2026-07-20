@@ -341,15 +341,11 @@ function CommentsSection({
   const { showToast } = useToast();
   const addComment = useAddComment(document.id);
   const [text, setText] = useState("");
-  const [textError, setTextError] = useState<string | null>(null);
+  const canSubmit = text.trim().length > 0 && !addComment.isPending;
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!text.trim()) {
-      setTextError(t("detail.commentRequired"));
-      return;
-    }
-    setTextError(null);
+    if (!canSubmit) return;
     addComment.mutate(
       { author: currentUser.name, text: text.trim() },
       {
@@ -389,13 +385,7 @@ function CommentsSection({
             rows={3}
             placeholder={t("detail.commentPlaceholder")}
             onChange={(e) => setText(e.target.value)}
-            aria-invalid={textError ? true : undefined}
           />
-          {textError ? (
-            <p className="form-field__error" role="alert">
-              {textError}
-            </p>
-          ) : null}
           {addComment.isError ? (
             <p className="form-field__error" role="alert">
               {t("toast.actionFailed", { message: addComment.error.message })}
@@ -404,7 +394,7 @@ function CommentsSection({
           <button
             type="submit"
             className="button"
-            disabled={addComment.isPending}
+            disabled={!canSubmit}
             aria-busy={addComment.isPending}
           >
             {t("detail.addComment")}

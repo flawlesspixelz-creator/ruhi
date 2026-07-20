@@ -47,6 +47,7 @@
     "owner": "Omistaja",
     "from": "Luotu alkaen",
     "to": "Luotu asti",
+    "invalidDate": "Anna kelvollinen päivämäärä.",
     "anyStatus": "Kaikki tilat",
     "anyType": "Kaikki tyypit",
     "anyOwner": "Kaikki omistajat",
@@ -65,7 +66,8 @@
       "priority": "Prioriteetti",
       "owner": "Omistaja",
       "created": "Luotu",
-      "due": "Määräpäivä"
+      "due": "Määräpäivä",
+      "actions": "Toiminnot"
     },
     "sortAsc": "nouseva",
     "sortDesc": "laskeva",
@@ -104,7 +106,6 @@
     "addComment": "Lisää kommentti",
     "commentLabel": "Uusi kommentti",
     "commentPlaceholder": "Kirjoita kommentti…",
-    "commentRequired": "Kommentin teksti on pakollinen.",
     "history": "Hyväksyntähistoria",
     "historyAction": {
       "created": "Luotu",

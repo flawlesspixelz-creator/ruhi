@@ -1,15 +1,20 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useDocumentsQuery, useUsersQuery } from "../hooks/useDocuments";
 import { useUrlListState } from "../hooks/useUrlListState";
+import { useDynamicPageSize } from "../hooks/useDynamicPageSize";
 import { useCurrentUser } from "../context/CurrentUserContext";
 import { applyListState } from "../domain/documentList";
-import type { DocumentListState, SortField } from "../domain/listState";
+import { canCreateDocument, getAvailableActions } from "../domain/permissions";
+import { PAGE_SIZE, type DocumentListState, type SortField } from "../domain/listState";
 import type { ApprovalDocument, DocumentStatus, DocumentType } from "../types/document";
+import type { CurrentUser } from "../types/user";
 import { StatusBadge } from "../components/StatusBadge";
 import { EmptyState, ErrorState, LoadingState } from "../components/Feedback";
 import { Pagination } from "../components/Pagination";
-import { formatDate } from "../utils/format";
+import { QuickApproveReject } from "../components/QuickApproveReject";
+import { formatDate, isValidDateInputValue } from "../utils/format";
 
 const STATUS_OPTIONS: DocumentStatus[] = [
   "draft",
@@ -41,9 +46,7 @@ export function DocumentListPage() {
   const documentsQuery = useDocumentsQuery();
   const usersQuery = useUsersQuery();
 
-  // Creating a new document is the creator role's job. Approvers act on
-  // existing documents; read-only users never mutate.
-  const canCreate = currentUser.role === "creator";
+  const canCreate = canCreateDocument(currentUser);
 
   const hasActiveFilters = Boolean(
     state.q || state.status || state.type || state.owner || state.from || state.to,
@@ -92,6 +95,7 @@ export function DocumentListPage() {
           hasActiveFilters={hasActiveFilters}
           locale={i18n.language}
           documents={documentsQuery.data}
+          currentUser={currentUser}
         />
       )}
     </section>
@@ -112,6 +116,29 @@ function ListFilters({
   owners: { id: string; name: string }[];
 }) {
   const { t } = useTranslation();
+  const [dateErrors, setDateErrors] = useState<{ from?: string; to?: string }>({});
+
+  // Native <input type="date"> reports its own constraint violations via
+  // validity.badInput (surfaced through validity.valid) while the user is
+  // still editing an unparsable combination (e.g. day 31 in February). Some
+  // browsers only finalize that check once focus leaves the control, so we
+  // validate on both change and blur, and additionally re-check any value
+  // that does slip through with our own calendar round-trip.
+  const validateDate = (field: "from" | "to", el: HTMLInputElement): boolean => {
+    const isInvalid = !el.validity.valid || (el.value !== "" && !isValidDateInputValue(el.value));
+    setDateErrors((prev) => ({ ...prev, [field]: isInvalid ? t("list.invalidDate") : undefined }));
+    return isInvalid;
+  };
+
+  const handleDateChange = (field: "from" | "to") => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const el = e.target;
+    if (validateDate(field, el)) return;
+    update({ [field]: el.value } as Partial<DocumentListState>);
+  };
+
+  const handleDateBlur = (field: "from" | "to") => (e: React.FocusEvent<HTMLInputElement>) => {
+    validateDate(field, e.target);
+  };
 
   return (
     <form className="list-filters" role="search" onSubmit={(e) => e.preventDefault()}>
@@ -140,6 +167,7 @@ function ListFilters({
               </option>
             ))}
           </select>
+          <p className="form-field__error-slot" aria-hidden="true" />
         </label>
 
         <label>
@@ -155,6 +183,7 @@ function ListFilters({
               </option>
             ))}
           </select>
+          <p className="form-field__error-slot" aria-hidden="true" />
         </label>
 
         <label>
@@ -167,6 +196,7 @@ function ListFilters({
               </option>
             ))}
           </select>
+          <p className="form-field__error-slot" aria-hidden="true" />
         </label>
 
         <label>
@@ -175,8 +205,16 @@ function ListFilters({
             type="date"
             value={state.from}
             max={state.to || undefined}
-            onChange={(e) => update({ from: e.target.value })}
+            aria-invalid={dateErrors.from ? true : undefined}
+            onChange={handleDateChange("from")}
+            onBlur={handleDateBlur("from")}
           />
+          <p
+            className="form-field__error form-field__error-slot"
+            role={dateErrors.from ? "alert" : undefined}
+          >
+            {dateErrors.from}
+          </p>
         </label>
 
         <label>
@@ -185,8 +223,16 @@ function ListFilters({
             type="date"
             value={state.to}
             min={state.from || undefined}
-            onChange={(e) => update({ to: e.target.value })}
+            aria-invalid={dateErrors.to ? true : undefined}
+            onChange={handleDateChange("to")}
+            onBlur={handleDateBlur("to")}
           />
+          <p
+            className="form-field__error form-field__error-slot"
+            role={dateErrors.to ? "alert" : undefined}
+          >
+            {dateErrors.to}
+          </p>
         </label>
 
         {hasActiveFilters ? (
@@ -206,6 +252,7 @@ function ListResults({
   hasActiveFilters,
   locale,
   documents,
+  currentUser,
 }: {
   state: DocumentListState;
   update: (patch: Partial<DocumentListState>) => void;
@@ -213,9 +260,14 @@ function ListResults({
   hasActiveFilters: boolean;
   locale: string;
   documents: ApprovalDocument[];
+  currentUser: CurrentUser;
 }) {
   const { t } = useTranslation();
-  const result = applyListState(documents, state);
+  const { tableRef, pageSize } = useDynamicPageSize(PAGE_SIZE);
+  const result = applyListState(documents, state, pageSize);
+  // Only an approver can ever see approve/reject on any row, so gate the
+  // whole column on role rather than having it flicker in and out per page.
+  const showActionsColumn = currentUser.role === "approver";
 
   if (result.totalItems === 0) {
     return hasActiveFilters ? (
@@ -252,7 +304,7 @@ function ListResults({
         </label>
       </div>
 
-      <table className="document-table">
+      <table ref={tableRef} className="document-table">
         <thead>
           <tr>
             {SORTABLE_COLUMNS.map(({ field, labelKey }) => (
@@ -267,6 +319,7 @@ function ListResults({
             ))}
             <th scope="col">{t("list.col.type")}</th>
             <th scope="col">{t("list.col.owner")}</th>
+            {showActionsColumn ? <th scope="col">{t("list.col.actions")}</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -288,6 +341,13 @@ function ListResults({
               </td>
               <td data-label={t("list.col.type")}>{t(`docType.${doc.documentType}`)}</td>
               <td data-label={t("list.col.owner")}>{doc.owner.name}</td>
+              {showActionsColumn ? (
+                <td data-label={t("list.col.actions")}>
+                  {getAvailableActions(doc, currentUser).includes("approve") ? (
+                    <QuickApproveReject document={doc} />
+                  ) : null}
+                </td>
+              ) : null}
             </tr>
           ))}
         </tbody>

@@ -5,3 +5,4 @@ dist/
 *.log
 .DS_Store
 mock-api/uploads/
+mock-api/*.sqlite3*

@@ -1,4 +1,5 @@
 import type { DocumentStatus, DocumentType } from "../types/document";
+import { isValidDateInputValue } from "../utils/format";
 
 export type SortField =
   | "createdDate"
@@ -68,21 +69,8 @@ const SORT_VALUES: SortField[] = [
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-/**
- * True only for a real calendar date in `yyyy-mm-dd` form. The format regex
- * alone accepts impossible dates such as `2026-02-30`, which `new Date` would
- * silently roll forward (to Mar 2) and quietly shift a filter boundary.
- * Round-tripping the parsed UTC components rejects those.
- */
-function isValidDateString(value: string): boolean {
-  if (!DATE_PATTERN.test(value)) return false;
-  const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return (
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month - 1 &&
-    date.getUTCDate() === day
-  );
+function parseDate(raw: string): string {
+  return DATE_PATTERN.test(raw) && isValidDateInputValue(raw) ? raw : "";
 }
 
 function parseStatus(raw: string | null): DocumentStatus | "" {
@@ -105,8 +93,8 @@ export function parseListState(params: URLSearchParams): DocumentListState {
     status: parseStatus(params.get("status")),
     type: TYPE_VALUES.includes(rawType as DocumentType) ? (rawType as DocumentType) : "",
     owner: params.get("owner") ?? "",
-    from: isValidDateString(rawFrom) ? rawFrom : "",
-    to: isValidDateString(rawTo) ? rawTo : "",
+    from: parseDate(rawFrom),
+    to: parseDate(rawTo),
     sort: SORT_VALUES.includes(rawSort as SortField)
       ? (rawSort as SortField)
       : DEFAULT_LIST_STATE.sort,

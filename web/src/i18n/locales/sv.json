@@ -47,6 +47,7 @@
     "owner": "Ägare",
     "from": "Skapad från",
     "to": "Skapad till",
+    "invalidDate": "Ange ett giltigt datum.",
     "anyStatus": "Alla statusar",
     "anyType": "Alla typer",
     "anyOwner": "Alla ägare",
@@ -65,7 +66,8 @@
       "priority": "Prioritet",
       "owner": "Ägare",
       "created": "Skapad",
-      "due": "Förfallodatum"
+      "due": "Förfallodatum",
+      "actions": "Åtgärder"
     },
     "sortAsc": "stigande",
     "sortDesc": "fallande",
@@ -104,7 +106,6 @@
     "addComment": "Lägg till kommentar",
     "commentLabel": "Ny kommentar",
     "commentPlaceholder": "Skriv en kommentar…",
-    "commentRequired": "Kommentartext krävs.",
     "history": "Godkännandehistorik",
     "historyAction": {
       "created": "Skapad",

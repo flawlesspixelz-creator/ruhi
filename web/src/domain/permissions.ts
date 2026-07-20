@@ -14,10 +14,25 @@ export type DocumentAction =
   | "returnToDraft"
   | "comment";
 
-export type PermissionSubject = Pick<ApprovalDocument, "status" | "approvers">;
+export type PermissionSubject = Pick<ApprovalDocument, "status" | "approvers" | "owner">;
 
 export function isAssignedApprover(doc: PermissionSubject, user: CurrentUser): boolean {
   return doc.approvers.some((approver) => approver.id === user.id);
+}
+
+/** Creators and approvers may originate documents; read-only users never mutate. */
+export function canCreateDocument(user: CurrentUser): boolean {
+  return user.role !== "read-only";
+}
+
+/**
+ * A document's owner may never also be one of its approvers — that would let
+ * them review their own work, the same conflict `getAvailableActions` blocks
+ * once a document is pending. Enforced here too so the form never offers the
+ * pairing in the first place.
+ */
+export function isEligibleApprover(user: CurrentUser, ownerId: string): boolean {
+  return user.role === "approver" && user.id !== ownerId;
 }
 
 /**
@@ -28,6 +43,9 @@ export function isAssignedApprover(doc: PermissionSubject, user: CurrentUser): b
  * - Draft:            edit + submit for creators and approvers.
  * - Pending approval: approve + reject only for users with the approver role
  *                     who are also assigned as approvers on the document.
+ *                     An assigned approver who also owns the document gets
+ *                     neither action (no self-review): they can only add
+ *                     comments and wait for another approver to act.
  * - Approved:         terminal; view only (comments still allowed).
  * - Rejected:         edit (fix the fields in place) and return to draft;
  *                     resubmission = return to draft + submit, because the
@@ -46,7 +64,11 @@ export function getAvailableActions(
       actions.push("edit", "submit");
       break;
     case "pending_approval":
-      if (user.role === "approver" && isAssignedApprover(doc, user)) {
+      if (
+        user.role === "approver" &&
+        isAssignedApprover(doc, user) &&
+        doc.owner.id !== user.id
+      ) {
         actions.push("approve", "reject");
       }
       break;

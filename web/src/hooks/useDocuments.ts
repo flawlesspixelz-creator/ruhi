@@ -66,7 +66,8 @@ function useDocumentMutation<TVariables>(
 export function useCreateDocument() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (draft: DocumentDraft) => createDocument(draft),
+    mutationFn: ({ draft, actor }: { draft: DocumentDraft; actor: string }) =>
+      createDocument(draft, actor),
     onSuccess: (document) => {
       queryClient.setQueryData(documentKeys.detail(document.id), document);
       queryClient.invalidateQueries({ queryKey: documentKeys.all, exact: true });

@@ -10,7 +10,7 @@ import {
 } from "../hooks/useDocuments";
 import { useUnsavedChangesWarning } from "../hooks/useUnsavedChangesWarning";
 import { uploadPdf } from "../api/documents";
-import { canPerform } from "../domain/permissions";
+import { canCreateDocument, canPerform, isEligibleApprover } from "../domain/permissions";
 import {
   validateDocumentForm,
   validatePdfFile,
@@ -53,11 +53,11 @@ export function DocumentFormPage() {
   const { currentUser } = useCurrentUser();
   const navigate = useNavigate();
 
-  // Creating a new document is limited to the creator role. Edit access to an
-  // existing document is governed per-document by the permission matrix in
-  // EditFormLoader. Anyone who reaches /documents/new without the create right
-  // (approvers, read-only users) is sent back rather than shown a dead form.
-  const canCreateNew = currentUser.role === "creator";
+  // Edit access to an existing document is governed per-document by the
+  // permission matrix in EditFormLoader. Anyone who reaches /documents/new
+  // without the create right (read-only users) is sent back rather than
+  // shown a dead form.
+  const canCreateNew = canCreateDocument(currentUser);
   useEffect(() => {
     if (!id && !canCreateNew) navigate("/documents", { replace: true });
   }, [id, canCreateNew, navigate]);
@@ -146,7 +146,12 @@ function DocumentForm({ document }: { document: ApprovalDocument | null }) {
   dirtyRef.current = isDirty && !saving;
   const blocker = useUnsavedChangesWarning(dirtyRef);
 
-  const approverOptions = (usersQuery.data ?? []).filter((u) => u.role === "approver");
+  // The owner (creator on a new document, the existing owner when editing)
+  // can never be one of the document's own approvers.
+  const ownerId = document?.owner.id ?? currentUser.id;
+  const approverOptions = (usersQuery.data ?? []).filter((u) =>
+    isEligibleApprover(u, ownerId),
+  );
 
   const setField = <K extends keyof DocumentFormValues>(
     field: K,
@@ -233,9 +238,12 @@ function DocumentForm({ document }: { document: ApprovalDocument | null }) {
     } else {
       createMutation.mutate(
         {
-          ...draft,
-          createdDate: new Date().toISOString(),
-          owner: { id: currentUser.id, name: currentUser.name },
+          draft: {
+            ...draft,
+            createdDate: new Date().toISOString(),
+            owner: { id: currentUser.id, name: currentUser.name },
+          },
+          actor: currentUser.id,
         },
         {
           onSuccess: (saved) => onSuccess(saved, "form.created"),

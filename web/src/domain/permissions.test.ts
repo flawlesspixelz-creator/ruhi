@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getAvailableActions } from "./permissions";
+import { canCreateDocument, getAvailableActions, isEligibleApprover } from "./permissions";
 import { APPROVER, CREATOR, OTHER_APPROVER, READ_ONLY, makeDocument } from "../test/fixtures";
 
 /**
@@ -54,6 +54,18 @@ describe("getAvailableActions", () => {
     it("does not offer edit while pending", () => {
       expect(getAvailableActions(doc, CREATOR)).not.toContain("edit");
     });
+
+    it("offers neither approve nor reject to an assigned approver who owns the document", () => {
+      const ownDoc = makeDocument({
+        status: "pending_approval",
+        owner: { id: APPROVER.id, name: APPROVER.name },
+        approvers: [{ id: APPROVER.id, name: APPROVER.name }],
+      });
+      const actions = getAvailableActions(ownDoc, APPROVER);
+      expect(actions).not.toContain("approve");
+      expect(actions).not.toContain("reject");
+      expect(actions).toContain("comment");
+    });
   });
 
   describe("approved", () => {
@@ -94,5 +106,31 @@ describe("getAvailableActions", () => {
         expect(getAvailableActions(doc, READ_ONLY)).toEqual([]);
       },
     );
+  });
+});
+
+describe("canCreateDocument", () => {
+  it("allows creators and approvers", () => {
+    expect(canCreateDocument(CREATOR)).toBe(true);
+    expect(canCreateDocument(APPROVER)).toBe(true);
+  });
+
+  it("disallows read-only users", () => {
+    expect(canCreateDocument(READ_ONLY)).toBe(false);
+  });
+});
+
+describe("isEligibleApprover", () => {
+  it("allows an approver who does not own the document", () => {
+    expect(isEligibleApprover(APPROVER, CREATOR.id)).toBe(true);
+  });
+
+  it("disallows the document owner from being their own approver", () => {
+    expect(isEligibleApprover(APPROVER, APPROVER.id)).toBe(false);
+  });
+
+  it("disallows non-approver roles regardless of ownership", () => {
+    expect(isEligibleApprover(CREATOR, "someone-else")).toBe(false);
+    expect(isEligibleApprover(READ_ONLY, "someone-else")).toBe(false);
   });
 });

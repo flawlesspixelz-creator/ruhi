@@ -13,22 +13,21 @@ The brief leaves some permission questions open. The assumptions made, all
 centralized in `web/src/domain/permissions.ts` so they can be changed in one
 place:
 
-- **Who can create a new document?** Only the `creator` role. Authoring is the
-  creator's job in the workflow; approvers review and act on existing
-  documents rather than originate them, and read-only users cannot mutate at
-  all. This is deliberately narrower than editing an existing draft (next
-  point): the brief names distinct `creator`, `approver`, and `read-only`
-  roles but only constrains approve/reject and read-only, so limiting *new*
-  document creation to the creator role is the reading that best matches the
-  role names without inventing rules elsewhere. The gate lives in
-  `DocumentListPage` (the New document action) and `DocumentFormPage` (a guard
-  on `/documents/new`).
+- **Who can create a new document?** Any user except `read-only`, so both
+  `creator` and `approver` roles can originate documents. Read-only users
+  cannot mutate at all, per the brief; nothing in the brief restricts
+  authoring to the `creator` role specifically, and treating creator and
+  approver as one collaborative team matches the same reasoning already used
+  for editing an existing draft (next point). Centralized as
+  `canCreateDocument()` in `domain/permissions.ts` and consumed by
+  `DocumentListPage` (the New document action) and `DocumentFormPage` (the
+  guard on `/documents/new`) — no inline role checks in either page.
 - **Who can edit/submit a draft?** Any user except read-only ones, not just
   the owner. The seed data forces this choice: documents d3, d5, and d7 are
   owned by Dana Patel, a read-only user. If editing were owner-only, those
   documents could never be edited by anyone. Treating creators and approvers
   as one collaborative team for *existing* drafts matches the data and keeps
-  the workflow unblocked, even though only creators may originate new ones.
+  the workflow unblocked.
 - **Who can approve/reject?** Only users with the `approver` role **and**
   who are assigned in the document's approvers list. The brief says the
   approvers list drives "permission-aware workflow behavior", so an
@@ -41,8 +40,20 @@ place:
   *resubmission* is Return to draft → submit, because the API only accepts
   `submit` from `draft`, and the extra transition keeps the audit trail
   honest.
-- **Self-approval is not prevented** — the brief doesn't require separation
-  of duties, and the API allows it. Noted as a possible future rule.
+- **Self-review is prevented entirely.** An assigned approver who also owns
+  a pending document gets neither "approve" nor "reject" — deciding the
+  outcome of your own document either way is the conflict of interest, not
+  just the positive outcome. They can still comment and must wait for
+  another assigned approver to act. Enforced in `getAvailableActions` in
+  `domain/permissions.ts`, so the buttons are simply absent rather than
+  disabled; the mock API doesn't enforce this itself (it's a fixed fixture),
+  so the rule only exists client-side.
+- **A document's owner can never be selected as one of its own approvers.**
+  This is the same conflict self-review guards against, caught earlier: the
+  create/edit form filters the owner (the creator on a new document, the
+  existing owner when editing) out of the approver checklist entirely via
+  `isEligibleApprover()`, so the pairing can't be created in the first place
+  rather than only being blocked later at approve/reject time.
 - The user selector is simulated authentication; switching user is switching
   identity, and the UI re-evaluates permissions immediately.
 
@@ -116,6 +127,15 @@ handling, and top-layer stacking from the platform instead of a library.
 Reject requires a reason before any request is sent; failures render inside
 the dialog and preserve what the user typed.
 
+**Quick approve/reject from the list.** A PR reviewer flagged that approving
+a document required opening its detail page first. The list now shows
+Approve/Reject directly on each row for an approver who can act on that
+row's document, using the same `getAvailableActions` check and the same
+confirm-and-mutate pattern (mandatory reject reason, preserved input on
+failure) as the detail page, via a small shared `QuickApproveReject`
+component. The column itself is gated on role, not per-row, so it doesn't
+appear and disappear as the page's data changes.
+
 **i18n with react-i18next.** All UI strings live in en/fi/sv resource files;
 dates and file sizes format through `Intl` with the active locale. The choice
 persists in localStorage and falls back to the browser language. i18next's
@@ -129,8 +149,8 @@ Shared where the product concept is genuinely shared:
   bar, the list's "New document" visibility, and the edit route guard. This
   is the most important reuse in the app: no component decides permissions.
 - `StatusBadge`, `ConfirmDialog`, `Toast`, `FormField`, feedback states
-  (loading/empty/error), `Pagination` — consistent UX for concepts that
-  appear on multiple screens.
+  (loading/empty/error), `Pagination`, `QuickApproveReject` — consistent UX
+  for concepts that appear on multiple screens.
 - `useUsersQuery` backs the header selector, the owner filter, and the
   approver picker — one source for "people".
 
@@ -142,13 +162,14 @@ and would mostly encode guesses about phase two.
 
 ## Testing approach
 
-Vitest + Testing Library + MSW; 60 tests. The selection principle: test the
+Vitest + Testing Library + MSW; 77 tests. The selection principle: test the
 behavior whose failure would corrupt the workflow or lose user work, at the
 lowest level that gives real confidence.
 
 - **Permission matrix (unit, exhaustive)** — every status × role combination,
   including the traps: unassigned approvers, creators listed as approvers,
-  read-only users assigned as approvers.
+  read-only users assigned as approvers, and an assigned approver who owns
+  the document (loses both approve and reject).
 - **List pipeline (unit)** — filter semantics, inclusive date boundaries,
   priority rank ordering, null due dates last in both directions, stable
   tie-breaks, page clamping. **URL codec** — alias handling, junk rejection,
@@ -164,6 +185,12 @@ lowest level that gives real confidence.
 
 Not covered on purpose: E2E browser automation (excluded by the brief),
 visual styling, and the mock API itself (a fixture).
+
+One infra caveat: `uploadPdf` uses a raw XHR (for upload-progress events,
+which `fetch` can't provide). MSW's node XHR interceptor doesn't resolve
+`FormData`-bodied requests under jsdom, so the one test exercising a failed
+upload mocks `uploadPdf` directly instead of a real intercepted request —
+every other network call in the suite goes through MSW's real interception.
 
 Run with: `npm test --prefix web` (or `npm run test:watch` during work).
 
@@ -190,8 +217,10 @@ Run with: `npm test --prefix web` (or `npm run test:watch` during work).
 Limitations: search matches title/customer/owner only; single new attachment
 per save (existing ones can be removed individually); no optimistic updates
 (every action waits for the server); language files are bundled eagerly;
-list data can be up to 30 s stale after external changes; no separation-of-
-duties rule for self-approval.
+list data can be up to 30 s stale after external changes; self-review
+(approve/reject on your own document) is blocked client-side only, so a
+direct API call could still bypass it since the mock API is a fixed
+fixture that doesn't enforce the rule.
 
 Top 3 next improvements, in order:
 

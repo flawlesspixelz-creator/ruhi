@@ -1,29 +1,47 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { api, seedReadHandlers, server } from "../test/server";
-import { APPROVER, CREATOR, makeDocument } from "../test/fixtures";
+import { APPROVER, CREATOR, READ_ONLY, makeDocument } from "../test/fixtures";
 import { renderApp } from "../test/utils";
 import type { ApprovalDocument } from "../types/document";
+import { ApiError } from "../api/client";
+import { uploadPdf } from "../api/documents";
+
+// The real uploadPdf() sends a multipart XHR body, which MSW's node
+// interceptor (as of @mswjs/interceptors 0.41.9) never resolves under
+// jsdom: the request hangs and neither `load` nor `error` fires. Mocking
+// this one function lets the upload-failure test exercise the form's
+// reaction without depending on that interception gap.
+vi.mock("../api/documents", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../api/documents")>();
+  return { ...actual, uploadPdf: vi.fn(actual.uploadPdf) };
+});
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  vi.mocked(uploadPdf).mockClear();
+});
 afterAll(() => server.close());
 
-async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
+async function fillRequiredFields(
+  user: ReturnType<typeof userEvent.setup>,
+  approverName = "Bob Martinez",
+) {
   await user.type(await screen.findByLabelText(/Title/), "New agreement");
   await user.type(screen.getByLabelText(/Customer/), "Northwind");
   await user.selectOptions(screen.getByLabelText(/Document type/), "Contract");
   await user.selectOptions(screen.getByLabelText(/^Priority/), "High");
-  await user.click(screen.getByRole("checkbox", { name: "Bob Martinez" }));
+  await user.click(screen.getByRole("checkbox", { name: approverName }));
 }
 
 describe("create document form", () => {
-  it("redirects non-creator roles away from the create page", async () => {
+  it("redirects read-only users away from the create page", async () => {
     seedReadHandlers([]);
 
-    const { router } = renderApp({ path: "/documents/new", user: APPROVER });
+    const { router } = renderApp({ path: "/documents/new", user: READ_ONLY });
 
     await waitFor(() =>
       expect(router.state.location.pathname).toBe("/documents"),
@@ -31,6 +49,30 @@ describe("create document form", () => {
     expect(
       screen.queryByRole("button", { name: "Create document" }),
     ).toBeNull();
+  });
+
+  it("allows an approver to create a document", async () => {
+    seedReadHandlers([]);
+    server.use(
+      http.post(api("/documents"), () =>
+        HttpResponse.json(makeDocument({ id: "created-by-approver" }), { status: 201 }),
+      ),
+      http.get(api("/documents/created-by-approver"), () =>
+        HttpResponse.json(makeDocument({ id: "created-by-approver" })),
+      ),
+    );
+
+    const user = userEvent.setup();
+    const { router } = renderApp({ path: "/documents/new", user: APPROVER });
+
+    // The acting user (Bob Martinez) is the document's owner here, so he
+    // cannot also be an approver on it; pick a different approver.
+    await fillRequiredFields(user, "Chen Wei");
+    await user.click(await screen.findByRole("button", { name: "Create document" }));
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/documents/created-by-approver"),
+    );
   });
 
   it("blocks submission and highlights every missing required field", async () => {
@@ -90,6 +132,10 @@ describe("create document form", () => {
       priority: "High",
       owner: { id: CREATOR.id, name: CREATOR.name },
       approvers: [{ id: "u2", name: "Bob Martinez" }],
+      // The mock API requires `actor` (the creating user's id) and derives
+      // the owner from it server-side; a request missing it is rejected
+      // with 400 regardless of what `owner` the client sends.
+      actor: CREATOR.id,
     });
   });
 
@@ -111,14 +157,12 @@ describe("create document form", () => {
     seedReadHandlers([]);
     let documentCreated = false;
     server.use(
-      http.post(api("/uploads"), () =>
-        HttpResponse.json({ error: "Storage unavailable" }, { status: 500 }),
-      ),
       http.post(api("/documents"), () => {
         documentCreated = true;
         return HttpResponse.json(makeDocument({}), { status: 201 });
       }),
     );
+    vi.mocked(uploadPdf).mockRejectedValueOnce(new ApiError("Storage unavailable", 500));
 
     const user = userEvent.setup();
     renderApp({ path: "/documents/new", user: CREATOR });

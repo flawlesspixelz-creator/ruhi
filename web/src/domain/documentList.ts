@@ -30,11 +30,9 @@ function matchesQuery(doc: ApprovalDocument, q: string): boolean {
 }
 
 function withinDateRange(doc: ApprovalDocument, from: string, to: string): boolean {
+  // Boundaries are parsed as UTC (not local time) so the filter's edges don't
+  // shift with the viewer's timezone relative to createdDate's UTC instant.
   const created = new Date(doc.createdDate).getTime();
-  // Anchor the boundaries to UTC (…Z) so the inclusive range lines up with the
-  // stored UTC createdDate. Without the Z, `${from}T00:00:00` parses in the
-  // viewer's local timezone, shifting the cutoff by their UTC offset and
-  // wrongly including/excluding documents near either edge of the range.
   if (from && created < new Date(`${from}T00:00:00.000Z`).getTime()) return false;
   if (to && created > new Date(`${to}T23:59:59.999Z`).getTime()) return false;
   return true;
@@ -99,18 +97,23 @@ export function sortDocuments(
   });
 }
 
-/** Filter, sort, and paginate in one pass; the page is clamped into range. */
+/**
+ * Filter, sort, and paginate in one pass; the page is clamped into range.
+ * `pageSize` defaults to the static PAGE_SIZE but callers may pass a size
+ * computed from the available viewport height instead.
+ */
 export function applyListState(
   docs: ApprovalDocument[],
   state: DocumentListState,
+  pageSize: number = PAGE_SIZE,
 ): DocumentListResult {
   const filtered = sortDocuments(filterDocuments(docs, state), state);
   const totalItems = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const page = Math.min(Math.max(1, state.page), totalPages);
-  const start = (page - 1) * PAGE_SIZE;
+  const start = (page - 1) * pageSize;
   return {
-    items: filtered.slice(start, start + PAGE_SIZE),
+    items: filtered.slice(start, start + pageSize),
     totalItems,
     totalPages,
     page,

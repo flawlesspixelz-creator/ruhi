@@ -52,9 +52,14 @@ export function uploadPdf(
   });
 }
 
-export function createDocument(draft: DocumentDraft): Promise<ApprovalDocument> {
+/**
+ * `actor` is the creating user's id. The server resolves the document's
+ * owner from it and ignores any client-supplied `owner`.
+ */
+export function createDocument(draft: DocumentDraft, actor: string): Promise<ApprovalDocument> {
   return apiClient.post<ApprovalDocument>("/documents", {
     ...draft,
+    actor,
     status: "draft",
     comments: [],
     approvalHistory: [],

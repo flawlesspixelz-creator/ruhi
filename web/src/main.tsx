@@ -11,10 +11,14 @@ import { ToastProvider } from './components/Toast.tsx'
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // The mock API adds latency and flakiness; retry reads a little,
-      // but never retry mutations automatically (they are user-confirmed).
+      // The mock API adds latency and flakiness; retry reads a little.
       retry: 2,
       refetchOnWindowFocus: false,
+    },
+    mutations: {
+      // Mutations are user-confirmed workflow actions; auto-retrying could
+      // double-apply one or mask the conflict responses the API returns.
+      retry: false,
     },
   },
 })

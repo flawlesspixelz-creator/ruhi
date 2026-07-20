@@ -47,6 +47,7 @@
     "owner": "Owner",
     "from": "Created from",
     "to": "Created to",
+    "invalidDate": "Enter a valid date.",
     "anyStatus": "Any status",
     "anyType": "Any type",
     "anyOwner": "Any owner",
@@ -65,7 +66,8 @@
       "priority": "Priority",
       "owner": "Owner",
       "created": "Created",
-      "due": "Due"
+      "due": "Due",
+      "actions": "Actions"
     },
     "sortAsc": "ascending",
     "sortDesc": "descending",
@@ -104,7 +106,6 @@
     "addComment": "Add comment",
     "commentLabel": "New comment",
     "commentPlaceholder": "Write a comment…",
-    "commentRequired": "Comment text is required.",
     "history": "Approval history",
     "historyAction": {
       "created": "Created",

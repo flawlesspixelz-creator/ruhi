@@ -49,7 +49,7 @@ approval process. They are not the contents of the uploaded document itself.
 | Document type | Business category used to organize and filter documents. Choose one of `Contract`, `Invoice`, `Proposal`, `Report`, `Policy`, or `Other`. `Other` covers documents that do not fit the named categories. Required. | Creator |
 | Customer | Organization or business party the document concerns. Use `Internal` when it is not associated with an external customer. Required. | Creator |
 | Created date | Date and time when the record was first created. It does not change when the document is edited. | System |
-| Owner | User responsible for the document. For this exercise, this is the user who creates it. | System from current user |
+| Owner | User responsible for the document. For this exercise, this is the user who creates it. The server resolves it from the `actor` id sent when creating the document; any client-supplied `owner` value is ignored and it cannot be changed afterward. | System from current user |
 | Status | Current workflow state: `Draft`, `Pending Approval`, `Approved`, or `Rejected`. It changes only through workflow actions, not ordinary form editing. | System from workflow action |
 | Priority | Relative business urgency: `Low`, `Medium`, or `High`. It helps users decide what to review first; it does not automatically change workflow behavior. Required. | Creator |
 | Description | Optional plain-text context explaining what the document is and why approval is needed. | Creator |
@@ -189,10 +189,10 @@ documented HTTP contract above.
 
 ### Running the project
 
-Node.js 18 or later is required.
+Node.js 20 or later is required (the mock API's persistence dependency needs
+it).
 
 ```bash
-npm install
 npm run install:all
 npm run dev
 ```
@@ -210,8 +210,8 @@ loading and failure states can be exercised.
 | --- | --- | --- |
 | `GET` | `/documents` | List documents |
 | `GET` | `/documents/:id` | Get one document; returns 404 when absent |
-| `POST` | `/documents` | Create a draft |
-| `PUT` | `/documents/:id` | Update editable fields |
+| `POST` | `/documents` | Create a draft; body `{ actor, ...documentFields }`. `actor` is the creating user's id; `owner` is derived from it and any client-supplied `owner` is ignored |
+| `PUT` | `/documents/:id` | Update editable fields; ignores `id`, `status`, `owner`, `createdDate`, `comments`, and `approvalHistory` if present in the body |
 | `POST` | `/uploads` | Upload one PDF as multipart field `file`; returns attachment metadata |
 | `POST` | `/documents/:id/submit` | Move Draft to Pending Approval; body `{ actor }` |
 | `POST` | `/documents/:id/approve` | Move Pending to Approved; body `{ actor, comment? }` |
@@ -235,17 +235,32 @@ returned by `/uploads`; this is development storage, not a production design.
 - Any coding-assistant configuration you set up and used (for example claude.md files, project instructions or custom agents for development, code quality, or testing), included in your submission.
 
 
-## A possible second phase
+## Second phase: sequential approvals
 
-This exercise may continue with a second, separately scoped phase. In that
-phase, you may be asked to evolve or replace part of the supplied backend for
-an additional business requirement.
+**The business need:** Some customers require documents to be approved by
+more than one person, in a specific order — for example, a manager before
+finance. Today, any approver can act on a pending document at any time, in
+any order.
 
-The exact requirement will be provided at that time. It will be designed so a
-well-structured first-phase solution can be adapted within approximately one
-week. Do not attempt to predict or pre-build it. We will be interested in how
-you clarify the new requirement, evolve the data and API design, preserve
-existing behavior, test the change, and communicate trade-offs.
+**What to build:** When a document has more than one approver, they must
+approve in order. Only the current approver in line may act, and a rejection
+at any point rejects the whole document. Single-approver documents keep
+behaving as they do today.
+
+**What we expect from you:**
+
+- Clarify what "in order" means wherever the requirement is ambiguous, and
+  record the assumptions you land on.
+- Evolve the data model and API contract to support this. The mock API's
+  `db.json`/json-server persistence is no longer a fixed fixture for this
+  phase — replace it with a real, persistent datastore of your choice.
+- Preserve existing behavior you don't have a specific reason to change, and
+  keep the documented endpoints working unless this requirement gives you a
+  reason to change them.
+- Test the new behavior.
+- Update the API contract table and setup instructions in this README for
+  anything you add or change, and document your reasoning in `DESIGN.md` as
+  before.
 
 
 ## Out of scope for the first phase
@@ -258,18 +273,3 @@ selector represents authentication for this exercise.
 endpoints and behavior** (`mock-api/db.json`, `mock-api/server.js`). Treat
 them as a fixed fixture for this phase and build only against the documented
 HTTP contract above.
-
-## Added in this submission
-
-- `npm test` (from the root or `web/`) runs the unit and integration test
-  suite (Vitest + Testing Library + MSW). `npm run test:watch --prefix web`
-  for watch mode.
-- `npm run lint` and `npm run typecheck` run oxlint and `tsc -b` for `web/`.
-- `DESIGN.md` documents assumptions, decisions, reuse boundaries, testing
-  rationale, and known limitations.
-- `CLAUDE.md` contains the coding-assistant configuration used during
-  development.
-- New frontend dependencies: `@tanstack/react-query` (server state),
-  `i18next` + `react-i18next` (EN/FI/SV), and dev-only test tooling
-  (`vitest`, `@testing-library/*`, `msw`, `jsdom`). Setup commands are
-  unchanged: `npm run install:all && npm run dev`.

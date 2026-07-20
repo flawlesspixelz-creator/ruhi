@@ -1,14 +1,12 @@
 const express = require("express");
-const jsonServer = require("json-server");
 const cors = require("cors");
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
+const db = require("./db").open(process.env.DB_PATH || path.join(__dirname, "data.sqlite3"));
 
 const app = express();
-const router = jsonServer.router("db.json");
-const middlewares = jsonServer.defaults();
 const parseJson = express.json();
 const uploadDirectory = path.join(__dirname, "uploads");
 const maxPdfSize = 10 * 1024 * 1024;
@@ -23,36 +21,76 @@ app.use(cors());
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
-app.use(middlewares);
 
 // Simulate real-world network latency so loading states are actually visible.
+// Set MOCK_API_DETERMINISTIC=1 to skip this and the random failures below,
+// for scripted tests.
+const deterministic = process.env.MOCK_API_DETERMINISTIC === "1";
 app.use((req, res, next) => {
+  if (deterministic) return next();
   setTimeout(next, 400);
 });
 
-function getDb() {
-  return router.db;
+function findUser(id) {
+  return db.prepare("SELECT * FROM users WHERE id = ?").get(id);
 }
 
-function findDocument(id) {
-  return getDb().get("documents").find({ id }).value();
+function userRef(id) {
+  const user = findUser(id);
+  return user ? { id: user.id, name: user.name } : { id, name: id };
 }
 
-function pushHistory(doc, action, actor, comment = null) {
-  doc.approvalHistory = doc.approvalHistory || [];
-  doc.approvalHistory.push({
-    id: `h${doc.approvalHistory.length + 1}-${Date.now()}`,
+function serializeDocument(row) {
+  if (!row) return null;
+  const approverIds = JSON.parse(row.approvers);
+  const approvalSteps = JSON.parse(row.approval_steps);
+  return {
+    id: row.id,
+    title: row.title,
+    documentType: row.document_type,
+    customer: row.customer,
+    createdDate: row.created_date,
+    dueDate: row.due_date,
+    owner: userRef(row.owner_id),
+    status: row.status,
+    priority: row.priority,
+    description: row.description ?? undefined,
+    approvers: approverIds.map(userRef),
+    approvalSteps: approvalSteps.map((step) => ({
+      approver: userRef(step.userId),
+      status: step.status,
+      decidedAt: step.decidedAt,
+      comment: step.comment,
+    })),
+    comments: db.prepare("SELECT id, author, text, created_at AS createdAt FROM comments WHERE document_id = ? ORDER BY created_at").all(row.id),
+    attachments: db
+      .prepare("SELECT id, name, content_type AS contentType, size, url FROM attachments WHERE document_id = ?")
+      .all(row.id),
+    approvalHistory: db
+      .prepare("SELECT id, action, actor, comment, timestamp FROM approval_history WHERE document_id = ? ORDER BY timestamp")
+      .all(row.id),
+  };
+}
+
+function findDocumentRow(id) {
+  return db.prepare("SELECT * FROM documents WHERE id = ?").get(id);
+}
+
+function pushHistory(documentId, action, actor, comment = null) {
+  db.prepare("INSERT INTO approval_history (id, document_id, action, actor, comment, timestamp) VALUES (?, ?, ?, ?, ?, ?)").run(
+    `h-${crypto.randomUUID()}`,
+    documentId,
     action,
     actor,
     comment,
-    timestamp: new Date().toISOString(),
-  });
+    new Date().toISOString(),
+  );
 }
 
-function requireStatus(doc, expected, res) {
-  if (doc.status !== expected) {
+function requireStatus(row, expected, res) {
+  if (row.status !== expected) {
     res.status(409).json({
-      error: `Document is "${doc.status}", expected "${expected}" for this action.`,
+      error: `Document is "${row.status}", expected "${expected}" for this action.`,
     });
     return false;
   }
@@ -70,7 +108,7 @@ function requireActor(req, res) {
 
 // Roughly 1 in 12 write requests fails, so the frontend has to handle real API errors.
 function maybeSimulateFailure(res) {
-  if (Math.random() < 1 / 12) {
+  if (!deterministic && Math.random() < 1 / 12) {
     res.status(500).json({ error: "Simulated server error. Please try again." });
     return true;
   }
@@ -130,7 +168,10 @@ app.get("/sample-files/:filename.pdf", (req, res) => {
 
 function cleanDisplayName(originalName) {
   const filename = originalName.replace(/\\/g, "/").split("/").pop();
-  const cleaned = filename.replace(/[\u0000-\u001f\u007f]/g, "").trim();
+  const cleaned = Array.from(filename)
+    .filter((ch) => ch.charCodeAt(0) > 31 && ch.charCodeAt(0) !== 127)
+    .join("")
+    .trim();
   return cleaned.slice(0, 180) || "document.pdf";
 }
 
@@ -188,116 +229,235 @@ function hasInvalidAttachments(attachments) {
   );
 }
 
+app.get("/users", (req, res) => {
+  res.json(db.prepare("SELECT * FROM users").all());
+});
+
+app.get("/documents", (req, res) => {
+  const rows = db.prepare("SELECT * FROM documents ORDER BY created_date").all();
+  res.json(rows.map(serializeDocument));
+});
+
+app.get("/documents/:id", (req, res) => {
+  const row = findDocumentRow(req.params.id);
+  if (!row) return res.status(404).json({ error: "Document not found" });
+  res.json(serializeDocument(row));
+});
+
 app.post("/documents", parseJson, (req, res) => {
   const attachments = req.body.attachments ?? [];
   if (hasInvalidAttachments(attachments)) {
     return res.status(400).json({ error: "All attachments must be uploaded PDFs." });
   }
+  const actor = requireActor(req, res);
+  if (!actor) return;
+  const owner = findUser(actor);
+  if (!owner) {
+    return res.status(400).json({ error: "actor must be a known user id." });
+  }
   if (maybeSimulateFailure(res)) return;
 
-  const document = {
-    ...req.body,
-    id: crypto.randomUUID(),
-    status: "draft",
-    comments: [],
-    attachments,
-    approvalHistory: [],
-  };
-  getDb().get("documents").push(document).write();
-  res.status(201).json(document);
+  const { owner: _clientOwner, actor: _actor, approvers, attachments: _attachments, ...fields } = req.body;
+  const id = crypto.randomUUID();
+  const approverIds = Array.isArray(approvers) ? approvers.map((a) => (typeof a === "string" ? a : a.id)) : [];
+
+  db.prepare(
+    `INSERT INTO documents (id, title, document_type, customer, created_date, due_date, owner_id, status, priority, description, approvers, approval_steps)
+     VALUES (@id, @title, @documentType, @customer, @createdDate, @dueDate, @ownerId, 'draft', @priority, @description, @approvers, '[]')`,
+  ).run({
+    id,
+    title: fields.title,
+    documentType: fields.documentType,
+    customer: fields.customer,
+    createdDate: new Date().toISOString(),
+    dueDate: fields.dueDate ?? null,
+    ownerId: owner.id,
+    priority: fields.priority,
+    description: fields.description ?? null,
+    approvers: JSON.stringify(approverIds),
+  });
+
+  for (const attachment of attachments) {
+    db.prepare("INSERT INTO attachments (id, document_id, name, content_type, size, url) VALUES (?, ?, ?, ?, ?, ?)").run(
+      attachment.id || crypto.randomUUID(),
+      id,
+      attachment.name,
+      attachment.contentType,
+      attachment.size,
+      attachment.url,
+    );
+  }
+
+  pushHistory(id, "created", owner.name);
+  res.status(201).json(serializeDocument(findDocumentRow(id)));
 });
 
 app.put("/documents/:id", parseJson, (req, res) => {
-  const document = findDocument(req.params.id);
-  if (!document) return res.status(404).json({ error: "Document not found" });
+  const row = findDocumentRow(req.params.id);
+  if (!row) return res.status(404).json({ error: "Document not found" });
   if (req.body.attachments && hasInvalidAttachments(req.body.attachments)) {
     return res.status(400).json({ error: "All attachments must be uploaded PDFs." });
   }
   if (maybeSimulateFailure(res)) return;
 
-  const { id, status, comments, approvalHistory, ...editableFields } = req.body;
-  Object.assign(document, editableFields);
-  getDb().write();
-  res.json(document);
+  const { id, status, comments, approvalHistory, createdDate, owner, approvers, attachments, ...editableFields } = req.body;
+
+  const updates = { ...editableFields };
+  if (approvers) {
+    updates.approvers = JSON.stringify(approvers.map((a) => (typeof a === "string" ? a : a.id)));
+  }
+  const columns = {
+    title: "title",
+    documentType: "document_type",
+    customer: "customer",
+    dueDate: "due_date",
+    priority: "priority",
+    description: "description",
+    approvers: "approvers",
+  };
+  const setClauses = Object.keys(updates)
+    .filter((key) => columns[key])
+    .map((key) => `${columns[key]} = @${key}`);
+  if (setClauses.length > 0) {
+    db.prepare(`UPDATE documents SET ${setClauses.join(", ")} WHERE id = @id`).run({ ...updates, id: row.id });
+  }
+
+  if (attachments) {
+    db.prepare("DELETE FROM attachments WHERE document_id = ?").run(row.id);
+    for (const attachment of attachments) {
+      db.prepare("INSERT INTO attachments (id, document_id, name, content_type, size, url) VALUES (?, ?, ?, ?, ?, ?)").run(
+        attachment.id || crypto.randomUUID(),
+        row.id,
+        attachment.name,
+        attachment.contentType,
+        attachment.size,
+        attachment.url,
+      );
+    }
+  }
+
+  res.json(serializeDocument(findDocumentRow(row.id)));
 });
 
 app.post("/documents/:id/submit", parseJson, (req, res) => {
-  const doc = findDocument(req.params.id);
-  if (!doc) return res.status(404).json({ error: "Document not found" });
-  if (!requireStatus(doc, "draft", res)) return;
+  const row = findDocumentRow(req.params.id);
+  if (!row) return res.status(404).json({ error: "Document not found" });
+  if (!requireStatus(row, "draft", res)) return;
   const actor = requireActor(req, res);
   if (!actor) return;
+  const approverIds = JSON.parse(row.approvers);
+  if (approverIds.length === 0) {
+    return res.status(400).json({ error: "At least one approver is required to submit." });
+  }
   if (maybeSimulateFailure(res)) return;
 
-  doc.status = "pending_approval";
-  pushHistory(doc, "submitted", actor);
-  getDb().write();
-  res.json(doc);
+  const approvalSteps = approverIds.map((userId) => ({ userId, status: "pending", decidedAt: null, comment: null }));
+  db.prepare("UPDATE documents SET status = 'pending_approval', approval_steps = ? WHERE id = ?").run(
+    JSON.stringify(approvalSteps),
+    row.id,
+  );
+  pushHistory(row.id, "submitted", actor);
+  res.json(serializeDocument(findDocumentRow(row.id)));
 });
 
+// Approvers act in the order they appear on the document: only the first
+// approver whose step is still "pending" may approve or reject.
+function currentStep(approvalSteps) {
+  return approvalSteps.find((step) => step.status === "pending") || null;
+}
+
 app.post("/documents/:id/approve", parseJson, (req, res) => {
-  const doc = findDocument(req.params.id);
-  if (!doc) return res.status(404).json({ error: "Document not found" });
-  if (!requireStatus(doc, "pending_approval", res)) return;
+  const row = findDocumentRow(req.params.id);
+  if (!row) return res.status(404).json({ error: "Document not found" });
+  if (!requireStatus(row, "pending_approval", res)) return;
   const actor = requireActor(req, res);
   if (!actor) return;
+
+  const approvalSteps = JSON.parse(row.approval_steps);
+  const step = currentStep(approvalSteps);
+  if (!step || step.userId !== actor) {
+    return res.status(409).json({ error: "It is not this approver's turn to approve." });
+  }
   if (maybeSimulateFailure(res)) return;
 
-  doc.status = "approved";
-  pushHistory(doc, "approved", actor, req.body.comment || null);
-  getDb().write();
-  res.json(doc);
+  step.status = "approved";
+  step.decidedAt = new Date().toISOString();
+  step.comment = req.body.comment || null;
+  const isLastStep = approvalSteps.every((s) => s.status === "approved");
+
+  db.prepare("UPDATE documents SET approval_steps = ?, status = ? WHERE id = ?").run(
+    JSON.stringify(approvalSteps),
+    isLastStep ? "approved" : "pending_approval",
+    row.id,
+  );
+  pushHistory(row.id, "approved", userRef(actor).name, step.comment);
+  res.json(serializeDocument(findDocumentRow(row.id)));
 });
 
 app.post("/documents/:id/reject", parseJson, (req, res) => {
-  const doc = findDocument(req.params.id);
-  if (!doc) return res.status(404).json({ error: "Document not found" });
-  if (!requireStatus(doc, "pending_approval", res)) return;
+  const row = findDocumentRow(req.params.id);
+  if (!row) return res.status(404).json({ error: "Document not found" });
+  if (!requireStatus(row, "pending_approval", res)) return;
   const actor = requireActor(req, res);
   if (!actor) return;
   const reason = req.body.reason;
   if (!reason || !reason.trim()) {
     return res.status(400).json({ error: "A rejection reason is required." });
   }
+
+  const approvalSteps = JSON.parse(row.approval_steps);
+  const step = currentStep(approvalSteps);
+  if (!step || step.userId !== actor) {
+    return res.status(409).json({ error: "It is not this approver's turn to reject." });
+  }
   if (maybeSimulateFailure(res)) return;
 
-  doc.status = "rejected";
-  pushHistory(doc, "rejected", actor, reason);
-  getDb().write();
-  res.json(doc);
+  step.status = "rejected";
+  step.decidedAt = new Date().toISOString();
+  step.comment = reason;
+
+  db.prepare("UPDATE documents SET approval_steps = ?, status = 'rejected' WHERE id = ?").run(
+    JSON.stringify(approvalSteps),
+    row.id,
+  );
+  pushHistory(row.id, "rejected", userRef(actor).name, reason);
+  res.json(serializeDocument(findDocumentRow(row.id)));
 });
 
 app.post("/documents/:id/return-to-draft", parseJson, (req, res) => {
-  const doc = findDocument(req.params.id);
-  if (!doc) return res.status(404).json({ error: "Document not found" });
-  if (!requireStatus(doc, "rejected", res)) return;
+  const row = findDocumentRow(req.params.id);
+  if (!row) return res.status(404).json({ error: "Document not found" });
+  if (!requireStatus(row, "rejected", res)) return;
   const actor = requireActor(req, res);
   if (!actor) return;
 
-  doc.status = "draft";
-  pushHistory(doc, "returned_to_draft", actor);
-  getDb().write();
-  res.json(doc);
+  db.prepare("UPDATE documents SET status = 'draft' WHERE id = ?").run(row.id);
+  pushHistory(row.id, "returned_to_draft", actor);
+  res.json(serializeDocument(findDocumentRow(row.id)));
 });
 
 app.post("/documents/:id/comments", parseJson, (req, res) => {
-  const doc = findDocument(req.params.id);
-  if (!doc) return res.status(404).json({ error: "Document not found" });
+  const row = findDocumentRow(req.params.id);
+  if (!row) return res.status(404).json({ error: "Document not found" });
   const { author, text } = req.body;
   if (!text || !text.trim()) {
     return res.status(400).json({ error: "Comment text is required." });
   }
   if (maybeSimulateFailure(res)) return;
 
-  doc.comments = doc.comments || [];
   const comment = {
-    id: `c${doc.comments.length + 1}-${Date.now()}`,
+    id: `c-${crypto.randomUUID()}`,
     author: author || "Unknown",
     text,
     createdAt: new Date().toISOString(),
   };
-  doc.comments.push(comment);
-  getDb().write();
+  db.prepare("INSERT INTO comments (id, document_id, author, text, created_at) VALUES (?, ?, ?, ?, ?)").run(
+    comment.id,
+    row.id,
+    comment.author,
+    comment.text,
+    comment.createdAt,
+  );
   res.status(201).json(comment);
 });
 
@@ -310,10 +470,6 @@ app.use((error, req, res, next) => {
   }
   next(error);
 });
-
-// Falls through to json-server's default REST router for:
-// GET/POST /documents, GET/PUT/PATCH/DELETE /documents/:id, GET /users
-app.use(router);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
