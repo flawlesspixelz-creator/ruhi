@@ -339,6 +339,20 @@ textarea:focus-visible,
   margin: 0;
 }
 
+/* Wraps the Clear filters button in the same column structure as a filter
+   field (control + reserved error slot) so it aligns with the inputs, not
+   the fields' lower baseline. */
+.list-filters__action {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.list-filters__action .button {
+  height: 42px;
+  min-height: 42px;
+}
+
 .list-meta {
   display: flex;
   align-items: center;
@@ -948,8 +962,12 @@ textarea:focus-visible,
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 
-  .list-filters__row .button {
+  .list-filters__action {
     grid-column: 1 / -1;
+  }
+
+  .list-filters__action .button {
+    width: 100%;
   }
 
   .document-form__actions .button,

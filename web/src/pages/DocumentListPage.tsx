@@ -236,9 +236,15 @@ function ListFilters({
         </label>
 
         {hasActiveFilters ? (
-          <button type="button" className="button" onClick={reset}>
-            {t("list.clearFilters")}
-          </button>
+          // Mirror a filter field's structure (control + reserved error slot)
+          // so the row's align-items:end lines the button up with the inputs
+          // rather than the fields' baseline below their reserved slots.
+          <div className="list-filters__action">
+            <button type="button" className="button" onClick={reset}>
+              {t("list.clearFilters")}
+            </button>
+            <p className="form-field__error-slot" aria-hidden="true" />
+          </div>
         ) : null}
       </div>
     </form>
